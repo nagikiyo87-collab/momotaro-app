@@ -1,4 +1,4 @@
-import { StrictMode, useState } from 'react';
+import { StrictMode, useState, useEffect } from 'react'; // 🔑 useEffect を追加
 import { createRoot } from 'react-dom/client';
 import './styles/index.css';
 
@@ -8,7 +8,7 @@ import { GamePage } from './pages/GamePage';
 import { useGameActions } from './hooks/useGameActions';
 import { useAuth } from './hooks/useAuth';
 
-// 🔑 Firestoreを直接読み込むためのimportを追加
+// 🔑 Firestoreを直接読み込むためのimport
 import { doc, getDoc } from 'firebase/firestore';
 import { db } from './firebase';
 
@@ -17,11 +17,27 @@ const App = () => {
   const { userId } = useAuth();
   const [joinedRoomId, setJoinedRoomId] = useState<string | null>(null);
 
+  // 🔑 1. アプリ起動（リロード）時に、スマホに保存された部屋IDを自動復元！
+  useEffect(() => {
+    // ※URLに新しい ?roomId=... がついている場合は招待優先のため自動復元をスキップ
+    const params = new URLSearchParams(window.location.search);
+    const urlRoomId = params.get('roomId');
+
+    if (!urlRoomId) {
+      const savedRoomId = localStorage.getItem('savedRoomId');
+      if (savedRoomId) {
+        setJoinedRoomId(savedRoomId);
+      }
+    }
+  }, []);
+
   const handleHostGame = async (playerName: string) => {
     if (!userId) throw new Error("通信の準備ができていません");
     const roomId = await createRoom(userId, playerName);
     if (!roomId) throw new Error("システムエラーにより部屋が作れませんでした");
     
+    // 🔑 部屋IDをスマホに保存
+    localStorage.setItem('savedRoomId', roomId);
     setJoinedRoomId(roomId);
     return roomId;
   };
@@ -29,14 +45,15 @@ const App = () => {
   const handleJoinGame = async (roomId: string, playerName: string) => {
     if (!userId) throw new Error("通信の準備ができていません");
 
-    // 🔑 通信エラーやリロードからの「復帰（リジューム）」チェック
+    // 通信エラーやリロードからの「復帰（リジューム）」チェック
     const roomRef = doc(db, 'rooms', roomId);
     const roomSnap = await getDoc(roomRef);
 
     if (roomSnap.exists()) {
       const roomData = roomSnap.data();
-      // もし自分がすでにこの部屋のプレイヤーとして登録されていたら、新規参加処理をスキップして復帰！
       if (roomData.players && roomData.players[userId]) {
+        // 🔑 部屋IDをスマホに保存
+        localStorage.setItem('savedRoomId', roomId);
         setJoinedRoomId(roomId);
         return;
       }
@@ -44,6 +61,9 @@ const App = () => {
 
     // まだ部屋にいない場合は通常の参加処理を行う
     await joinRoom(roomId, userId, playerName);
+    
+    // 🔑 部屋IDをスマホに保存
+    localStorage.setItem('savedRoomId', roomId);
     setJoinedRoomId(roomId); 
   };
 

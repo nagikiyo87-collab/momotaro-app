@@ -465,9 +465,11 @@ export const ResultPhaseUI: React.FC<{ me: any; opponent: any }> = ({ me, oppone
     return { rank: '🥉 Cランク', reward: 'コンビニで好きなアイス＆ジュース奢り（数百円）' };
   };
 
-  const handleGoHome = () => {
-    window.location.href = '/'; 
-  };
+// 🔑 アプリを初期化してトップに戻る処理
+const handleGoHome = () => {
+  localStorage.removeItem('savedRoomId'); // 🔑 追加: 保存された部屋IDを消去する
+  window.location.href = '/'; 
+};
 
   const myTotal = calculateTotalAsset(me);
   const opTotal = calculateTotalAsset(opponent);
