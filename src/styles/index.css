@@ -1,0 +1,75 @@
+/* Google Fonts から丸ゴシック「M PLUS Rounded 1c」を読み込み */
+@import url('https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@400;700;800&display=swap');
+
+body {
+  margin: 0;
+  /* アプリ全体のフォントを丸ゴシックに変更 */
+  font-family: 'M PLUS Rounded 1c', sans-serif;
+  background-color: #f4f6f9;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ==========================================
+   🎮 桃鉄風 ポップ＆立体ボタンのスタイル
+========================================== */
+.btn-pop {
+  font-family: 'M PLUS Rounded 1c', sans-serif;
+  font-weight: 800;
+  color: white;
+  background-color: #ff4757; /* デフォルトは赤系 */
+  border: 3px solid #fff; /* 白い太フチ */
+  border-radius: 12px; /* 丸みのある角 */
+  padding: 12px 20px;
+  font-size: 1.1rem;
+  cursor: pointer;
+  outline: none;
+  /* 立体感のキモ：下に濃い色の影（厚み）と、全体のドロップシャドウ */
+  box-shadow: 0 6px 0 #c0392b, 0 8px 10px rgba(0,0,0,0.2);
+  transition: all 0.1s ease;
+  width: 100%;
+  text-align: center;
+}
+
+/* 👆 ボタンを押した時の「凹む」アニメーション */
+.btn-pop:active {
+  transform: translateY(6px); /* 下にずらす */
+  box-shadow: 0 0px 0 #c0392b, 0 2px 4px rgba(0,0,0,0.2); /* 厚みをなくす */
+}
+
+/* 無効化（押せない時）のスタイル */
+.btn-pop:disabled {
+  background-color: #bdc3c7;
+  border-color: #ecf0f1;
+  box-shadow: 0 6px 0 #7f8c8d;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* 🎨 カラーバリエーション（青） */
+.btn-blue {
+  background-color: #3498db;
+  box-shadow: 0 6px 0 #2980b9, 0 8px 10px rgba(0,0,0,0.2);
+}
+.btn-blue:active:not(:disabled) { box-shadow: 0 0px 0 #2980b9, 0 2px 4px rgba(0,0,0,0.2); }
+
+/* 🎨 カラーバリエーション（緑） */
+.btn-green {
+  background-color: #2ed573;
+  box-shadow: 0 6px 0 #218c53, 0 8px 10px rgba(0,0,0,0.2);
+}
+.btn-green:active:not(:disabled) { box-shadow: 0 0px 0 #218c53, 0 2px 4px rgba(0,0,0,0.2); }
+
+/* 🎨 カラーバリエーション（紫） */
+.btn-purple {
+  background-color: #9b59b6;
+  box-shadow: 0 6px 0 #71368a, 0 8px 10px rgba(0,0,0,0.2);
+}
+.btn-purple:active:not(:disabled) { box-shadow: 0 0px 0 #71368a, 0 2px 4px rgba(0,0,0,0.2); }
+
+/* 🎨 カラーバリエーション（グレー） */
+.btn-gray {
+  background-color: #747d8c;
+  box-shadow: 0 6px 0 #2f3542, 0 8px 10px rgba(0,0,0,0.2);
+}
+.btn-gray:active:not(:disabled) { box-shadow: 0 0px 0 #2f3542, 0 2px 4px rgba(0,0,0,0.2); }

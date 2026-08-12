@@ -199,7 +199,7 @@ export const TitlePage: React.FC<Props> = ({ onHostGame, onJoinGame }) => {
         <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
           <input
             type="text"
-            placeholder="6桁の部屋番号を入力"
+            placeholder="6桁のルームIDを入力"
             value={inputRoomId}
             onChange={(e) => setInputRoomId(e.target.value)}
             style={inputStyle}

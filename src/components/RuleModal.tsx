@@ -1,124 +1,160 @@
-import React from 'react';
+import React, { useState } from 'react';
+import { ITEMS } from '../data/gameData';
 
 type Props = {
   isOpen: boolean;
   onClose: () => void;
 };
 
+type TabType = 'basic' | 'mission' | 'property' | 'bomby' | 'item';
+
 export const RuleModal: React.FC<Props> = ({ isOpen, onClose }) => {
+  const [activeTab, setActiveTab] = useState<TabType>('basic');
+  const [openAccordion, setOpenAccordion] = useState<string | null>(null);
+
   if (!isOpen) return null;
 
+  const toggleAccordion = (id: string) => {
+    setOpenAccordion(openAccordion === id ? null : id);
+  };
+
+  // アイテムの系統を日本語に変換する関数
+  const getItemTypeName = (type: string) => {
+    switch (type) {
+      case 'attack': return '⚔️ 妨害・逆転系';
+      case 'support': return '✨ 自身強化・便利系';
+      case 'defense': return '🛡️ 防御・回避系';
+      default: return '🎒 その他';
+    }
+  };
+
   return (
-    <div style={overlayStyle}>
-      <div style={modalStyle}>
-        <div style={headerStyle}>
-          <h3 style={{ margin: 0, fontSize: '1.2rem', color: '#2c3e50' }}>📖 ルール確認</h3>
-          <button onClick={onClose} style={closeBtnStyle}>✖</button>
+    <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.7)', zIndex: 99999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '15px' }}>
+      <div style={{ background: '#fff', width: '100%', maxWidth: '500px', maxHeight: '90vh', borderRadius: '16px', display: 'flex', flexDirection: 'column', overflow: 'hidden', boxShadow: '0 10px 25px rgba(0,0,0,0.2)' }}>
+        
+        {/* ヘッダー部分 */}
+        <div style={{ background: '#f1c40f', padding: '15px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <h2 style={{ margin: 0, color: '#d35400', fontSize: '1.2rem', fontWeight: '900' }}>📖 ルール確認</h2>
+          <button onClick={onClose} style={{ background: '#fff', border: 'none', width: '30px', height: '30px', borderRadius: '50%', fontWeight: 'bold', color: '#d35400', cursor: 'pointer' }}>✕</button>
         </div>
 
-        <div style={contentStyle}>
-          <p style={{ fontSize: '0.85rem', color: '#666', marginBottom: '15px', textAlign: 'left' }}>
-            タップすると詳細が開きます。
-          </p>
+        {/* タブ切り替え */}
+        <div style={{ display: 'flex', overflowX: 'auto', background: '#f8f9fa', borderBottom: '2px solid #ecf0f1', padding: '0 10px' }}>
+          {[
+            { id: 'basic', label: '基本' },
+            { id: 'mission', label: 'マス' },
+            { id: 'property', label: '物件' },
+            { id: 'bomby', label: '貧乏神' },
+            { id: 'item', label: 'アイテム' }
+          ].map(tab => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id as TabType)}
+              style={{
+                background: 'none', border: 'none', padding: '12px 15px', fontSize: '0.9rem', fontWeight: 'bold', whiteSpace: 'nowrap', cursor: 'pointer',
+                color: activeTab === tab.id ? '#e67e22' : '#7f8c8d',
+                borderBottom: activeTab === tab.id ? '3px solid #e67e22' : '3px solid transparent'
+              }}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
 
-          <details style={detailsStyle}>
-            <summary style={summaryStyle}>🏆 勝利条件と基本の流れ</summary>
-            <div style={innerContentStyle}>
-              <ul style={ulStyle}>
-                <li style={liStyle}><strong>ゴール:</strong> 高尾山口駅（サイコロの目がオーバーしても到着）</li>
-                <li style={liStyle}><strong>勝敗:</strong> ゴール到達時の「所持金 ＋ 物件価値」の総資産が多い方の勝利。差額によって敗者の奢りランクが決定。</li>
-                <li style={liStyle}><strong>季節と決算:</strong> 1ターンごとに「春→夏→秋→冬」と進み、冬の終わりに物件収益が振り込まれる（決算）。</li>
+        {/* コンテンツ部分 */}
+        <div style={{ padding: '20px', overflowY: 'auto', flex: 1, background: '#fdfdfd' }}>
+          
+          {activeTab === 'basic' && (
+            <div>
+              <h3 style={{ color: '#2c3e50', borderBottom: '2px solid #ecf0f1', paddingBottom: '8px', marginBottom: '15px' }}>🏆 勝利条件と基本の流れ</h3>
+              <p style={{ fontSize: '0.9rem', lineHeight: '1.6', color: '#34495e' }}>
+                **【勝利条件】**<br/>
+                ゴール（高尾山口駅）に到着した時点で、**「所持金 ＋ 物件の価値」** の総資産が多かった方の勝利です。<br/><br/>
+                **【ゲームの流れ】**<br/>
+                ① サイコロを振って2人で進む。<br/>
+                ② ルーレットで滞在時間を決める。<br/>
+                ③ 各自ミッションに挑戦し、報酬やペナルティを受ける。<br/>
+                ④ その駅の「物件」をシークレット入札で購入する。<br/>
+                ⑤ 春→夏→秋→冬 と季節が進み、冬の終わりに決算（物件の収益受け取り）が発生します。
+              </p>
+            </div>
+          )}
+
+          {activeTab === 'item' && (
+            <div>
+              <h3 style={{ color: '#2c3e50', borderBottom: '2px solid #ecf0f1', paddingBottom: '8px', marginBottom: '15px' }}>🎒 アイテムについて</h3>
+              <p style={{ fontSize: '0.9rem', lineHeight: '1.6', color: '#34495e', marginBottom: '15px', background: '#fff3e0', padding: '10px', borderRadius: '8px' }}>
+                ・アイテムは最大 **3個** まで持てます。<br/>
+                ・4個目を手に入れた時は、どれか1つを捨てます。<br/>
+                ・1度使うとなくなります。
+              </p>
+
+              {/* アイテム一覧を自動生成 */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                {ITEMS.map(item => (
+                  <div key={item.id} style={{ border: '1px solid #dcdde1', borderRadius: '8px', overflow: 'hidden' }}>
+                    <button 
+                      onClick={() => toggleAccordion(item.id)}
+                      style={{ width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 15px', background: openAccordion === item.id ? '#f1f2f6' : '#fff', border: 'none', cursor: 'pointer', textAlign: 'left' }}
+                    >
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                        <span style={{ fontSize: '0.75rem', color: '#7f8c8d', fontWeight: 'bold' }}>{getItemTypeName(item.type)}</span>
+                        <span style={{ fontSize: '1rem', fontWeight: 'bold', color: '#2c3e50' }}>{item.name}</span>
+                      </div>
+                      <span style={{ color: '#bdc3c7', fontSize: '1.2rem' }}>
+                        {openAccordion === item.id ? '−' : '＋'}
+                      </span>
+                    </button>
+                    {openAccordion === item.id && (
+                      <div style={{ padding: '15px', background: '#fff', borderTop: '1px dashed #dcdde1', fontSize: '0.9rem', color: '#34495e', lineHeight: '1.5' }}>
+                        {item.description}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* 他のタブ（省略せずに最低限の記載を入れておきます） */}
+          {activeTab === 'mission' && (
+            <div>
+              <h3 style={{ color: '#2c3e50', borderBottom: '2px solid #ecf0f1', paddingBottom: '8px', marginBottom: '15px' }}>📍 マスの種類</h3>
+              <ul style={{ fontSize: '0.9rem', lineHeight: '1.6', color: '#34495e', paddingLeft: '20px' }}>
+                <li><b style={{ color: '#3498db' }}>🔵 青マス</b>：成功でお金がもらえる！</li>
+                <li><b style={{ color: '#e74c3c' }}>🔴 赤マス</b>：失敗するとお金が減るか半分に…！</li>
+                <li><b style={{ color: '#2ecc71' }}>🟢 協力マス</b>：2人で成功すればボーナス！</li>
+                <li><b style={{ color: '#f1c40f' }}>🟡 アイテムマス</b>：成功するとアイテムGET！</li>
               </ul>
             </div>
-          </details>
+          )}
 
-          <details style={detailsStyle}>
-            <summary style={summaryStyle}>📍 マスの種類とミッション</summary>
-            <div style={innerContentStyle}>
-              <ul style={ulStyle}>
-                <li style={liStyle}><strong>🔵 青マス:</strong> 成功でボーナス。失敗してもペナルティなし。</li>
-                <li style={liStyle}><strong>🔴 赤マス:</strong> 成功でボーナスだが、失敗すると所持金が減るなどのペナルティ。</li>
-                <li style={liStyle}><strong>🟢 協力マス:</strong> 2人で挑戦。成功すれば2人ともボーナス。</li>
-                <li style={liStyle}><strong>🟡 アイテムマス:</strong> 成功するとアイテムを1つGET（最大3つまで）。</li>
-              </ul>
+          {activeTab === 'property' && (
+            <div>
+              <h3 style={{ color: '#2c3e50', borderBottom: '2px solid #ecf0f1', paddingBottom: '8px', marginBottom: '15px' }}>🏢 物件と借金</h3>
+              <p style={{ fontSize: '0.9rem', lineHeight: '1.6', color: '#34495e' }}>
+                ・ゲーム内の所持金のみで現実の買い物をします。<br/>
+                ・上限額を超えて買っても、ゲーム内では上限額として計算されます。<br/>
+                ・相手と同じ物件を選んだ場合は、**「実際の購入額が高い方」**が獲得します。（同額ならサイコロ勝負）<br/>
+                ・借金（マイナス）になると、**毎ターン20%の利息**が増えていきます。借金がある時は割り勘カードは使えません。
+              </p>
             </div>
-          </details>
+          )}
 
-          <details style={detailsStyle}>
-            <summary style={summaryStyle}>🛍️ リアル課金と物件システム</summary>
-            <div style={innerContentStyle}>
-              <ul style={ulStyle}>
-                <li style={liStyle}><strong>絶対ルール:</strong> 現実の飲食・買い物は「ゲーム内の所持金」の範囲内でしか使えない。</li>
-                <li style={liStyle}><strong>シークレット入札:</strong> 同じ物件（お店）を2人で選んだ場合、リアル購入額が高い方が獲得。</li>
-                <li style={liStyle}><strong>上限額:</strong> 物件の上限額以上のお金を使っても、ゲーム内の入札額は「上限額」に丸められる。</li>
-                <li style={liStyle}><strong>借金と売却:</strong> 所持金がマイナスになると物件が半額で強制売却。それでもマイナスなら毎ターン20%の利息がつく。</li>
-              </ul>
+          {activeTab === 'bomby' && (
+            <div>
+              <h3 style={{ color: '#2c3e50', borderBottom: '2px solid #ecf0f1', paddingBottom: '8px', marginBottom: '15px' }}>😈 貧乏神（ボンビー）</h3>
+              <p style={{ fontSize: '0.9rem', lineHeight: '1.6', color: '#34495e' }}>
+                ミッションに失敗すると取り憑かれます。ターン開始時に様々な悪行をしてきます。<br/><br/>
+                ・**貧乏神**：お金を減らしたり、ジュースを奢らせたりする。<br/>
+                ・**プチボンビー**：被害は少なめ。<br/>
+                ・**キングボンビー**：サイコロの目×1000円を奪う、一番高い物件を捨てるなど、致命的な被害をもたらす！
+              </p>
             </div>
-          </details>
-
-          <details style={detailsStyle}>
-            <summary style={summaryStyle}>😈 ボンビーシステム</summary>
-            <div style={innerContentStyle}>
-              <ul style={ulStyle}>
-                <li style={liStyle}><strong>憑依条件:</strong> ミッションに失敗した側に取り憑く（両方失敗はランダム）。</li>
-                <li style={liStyle}><strong>悪行発動:</strong> 憑依されている人の「ターン開始時」に悪行を働く。</li>
-                <li style={liStyle}><strong>変身:</strong> 毎ターン変身判定。（ノーマル 75% / プチ 20% / キング 5%）</li>
-                <li style={liStyle}><strong>キングボンビー:</strong> 所持金を大きく奪い、一番高い物件を強制没収する。</li>
-              </ul>
-            </div>
-          </details>
-
-          <details style={detailsStyle}>
-            <summary style={summaryStyle}>🎒 アイテムについて</summary>
-            <div style={innerContentStyle}>
-              <ul style={ulStyle}>
-                <li style={liStyle}><strong>所持上限:</strong> 最大3つまで。</li>
-                <li style={liStyle}><strong>使用タイミング:</strong> 自分のターンの「サイコロを振る前」に1ターン1回だけ使える。</li>
-              </ul>
-            </div>
-          </details>
+          )}
 
         </div>
       </div>
     </div>
   );
-};
-
-// --- スタイル定義 ---
-const overlayStyle: React.CSSProperties = {
-  position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh',
-  backgroundColor: 'rgba(0, 0, 0, 0.6)', zIndex: 1000,
-  display: 'flex', justifyContent: 'center', alignItems: 'center',
-  padding: '20px', boxSizing: 'border-box'
-};
-const modalStyle: React.CSSProperties = {
-  backgroundColor: '#fff', borderRadius: '12px', width: '100%', maxWidth: '400px',
-  maxHeight: '85vh', display: 'flex', flexDirection: 'column',
-  boxShadow: '0 10px 25px rgba(0,0,0,0.2)', overflow: 'hidden'
-};
-const headerStyle: React.CSSProperties = {
-  padding: '15px 20px', borderBottom: '1px solid #eee', background: '#f8f9fa',
-  display: 'flex', justifyContent: 'space-between', alignItems: 'center'
-};
-const closeBtnStyle: React.CSSProperties = {
-  background: 'none', border: 'none', fontSize: '1.5rem', color: '#7f8c8d', cursor: 'pointer', padding: 0
-};
-const contentStyle: React.CSSProperties = {
-  padding: '20px', overflowY: 'auto', flex: 1, textAlign: 'left'
-};
-const detailsStyle: React.CSSProperties = {
-  marginBottom: '10px', background: '#fdfefe', border: '1px solid #e0e0e0', borderRadius: '6px',
-};
-const summaryStyle: React.CSSProperties = {
-  padding: '12px 15px', fontWeight: 'bold', fontSize: '0.95rem', color: '#34495e',
-  cursor: 'pointer', outline: 'none', listStyle: 'none', display: 'flex', alignItems: 'center'
-};
-const innerContentStyle: React.CSSProperties = {
-  padding: '10px 15px 15px 15px', borderTop: '1px dashed #eee', fontSize: '0.85rem', color: '#555', lineHeight: '1.6', textAlign: 'left'
-};
-const ulStyle: React.CSSProperties = {
-  margin: 0, paddingLeft: '18px', textAlign: 'left'
-};
-const liStyle: React.CSSProperties = {
-  marginBottom: '6px', textAlign: 'left'
 };
