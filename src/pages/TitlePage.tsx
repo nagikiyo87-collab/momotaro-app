@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react'; // 🔑 useEffect を追加
 import { QRCodeSVG } from 'qrcode.react';
 
 type Props = {
@@ -20,6 +20,18 @@ export const TitlePage: React.FC<Props> = ({ onHostGame, onJoinGame }) => {
   const [mode, setMode] = useState<'menu' | 'host' | 'join'>('menu');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+
+  // 🔑 追加：URLに ?roomId=XXXX が含まれている場合、自動で参加モード画面を開く！
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const urlRoomId = params.get('roomId');
+    
+    if (urlRoomId) {
+      setInputRoomId(urlRoomId.toUpperCase()); // ルームIDをセット
+      setStep('room_setup');                   // 部屋設定画面へスキップ
+      setMode('join');                         // 参加モードにする
+    }
+  }, []);
 
   // 1. 部屋を作る処理
   const handleHost = async () => {
@@ -179,7 +191,7 @@ export const TitlePage: React.FC<Props> = ({ onHostGame, onJoinGame }) => {
                 {createdRoomId}
               </div>
               
-              {/* QRコード（検索ではなく、アクセス用URLを埋め込み） */}
+              {/* QRコード */}
               {inviteUrl && (
                 <div style={{ background: '#fff', padding: '10px', display: 'inline-block', borderRadius: '8px' }}>
                   <QRCodeSVG value={inviteUrl} size={160} />
