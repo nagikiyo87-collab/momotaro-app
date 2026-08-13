@@ -3,9 +3,10 @@ import { useGameSync } from '../hooks/useGameSync';
 import { useTurnActions } from '../hooks/useTurnActions';
 import { STATIONS, STATION_PROPERTIES, MISSIONS, ITEMS } from '../data/gameData'; 
 import { RuleModal } from '../components/RuleModal';
-import { GameHeader, PlayerCards, GameMapView, BottomNav, AnimatedDice, AnimatedRoulette, SeasonalBackground, MissionPhaseUI, BiddingPhaseUI, ResultPhaseUI, QuitButton } from '../components/GameUI';
+import { GameHeader, PlayerCards, GameMapView, BottomNav, AnimatedDice, AnimatedRoulette, SeasonalBackground, MissionPhaseUI, SpendingPhaseUI, BiddingPhaseUI, ResultPhaseUI } from '../components/GameUI';
 import { motion, AnimatePresence } from 'framer-motion';
 import '../styles/index.css'; 
+
 
 type Props = { roomId: string; userId: string; };
 
@@ -30,6 +31,7 @@ export const GamePage: React.FC<Props> = ({ roomId, userId }) => {
 
   useEffect(() => {
     if (phase !== 'bidding') { actions.setSelectedPropertyId(''); actions.setBidAmount(0); }
+    if (phase !== 'spending') { actions.setSpentInput(''); } // 🔑 追加
     if (phase === 'dice') { actions.setActiveItemEffect(null); }
   }, [phase]);
 
@@ -126,7 +128,7 @@ export const GamePage: React.FC<Props> = ({ roomId, userId }) => {
                       {/* 🔑 3Dサイコロアニメーション部品を配置 */}
                       <div style={{ marginBottom: '20px' }}>
                         <AnimatedDice 
-                          isRolling={actions.isRollingDice} 
+                          isRolling={actions.isAnimatingDice} 
                           result={actions.diceResult} 
                         />
                       </div>
@@ -153,7 +155,7 @@ export const GamePage: React.FC<Props> = ({ roomId, userId }) => {
                       {/* 🔑 スロット風ルーレットアニメーション部品を配置 */}
                       <div style={{ marginBottom: '20px' }}>
                         <AnimatedRoulette 
-                          isSpinning={actions.isSpinningRoulette} 
+                          isSpinning={actions.isAnimatingRoulette} 
                           result={actions.rouletteResult} 
                         />
                       </div>
@@ -204,6 +206,18 @@ export const GamePage: React.FC<Props> = ({ roomId, userId }) => {
                       />
                     </>
                   )}
+                  {phase === 'spending' && (
+                    <SpendingPhaseUI 
+                      spentInput={actions.spentInput} 
+                      setSpentInput={actions.setSpentInput}
+                      mySpending={roomData?.spendings?.[userId]} 
+                      opponentSpending={opponentId ? roomData?.spendings?.[opponentId] : undefined}
+                      bothSubmitted={!!(roomData?.spendings?.[userId] !== undefined && opponentId && roomData?.spendings?.[opponentId] !== undefined)}
+                      isMyTurn={isMyTurn}
+                      onSubmitSpending={actions.handleSubmitSpending}
+                      onFinishSpending={actions.handleFinishSpending}
+                    />
+                  )}
                   {phase === 'bidding' && (
                     <BiddingPhaseUI stayTime={roomData?.stayTime || 0} currentProperties={currentProperties} selectedPropertyId={actions.selectedPropertyId} setSelectedPropertyId={actions.setSelectedPropertyId} bidAmount={actions.bidAmount} setBidAmount={actions.setBidAmount} myBid={roomData?.bids?.[userId]} opponentBid={roomData?.bids?.[opponentId!]} bothSubmitted={!!(roomData?.bids?.[userId] && roomData?.bids?.[opponentId!])} isMyTurn={isMyTurn} onSubmitBid={actions.handleSubmitBid} onRevealBids={() => actions.handleRevealBids(roomData.bids[userId], roomData.bids[opponentId!])} myMoney={me?.money || 0} />
                   )}
@@ -221,9 +235,6 @@ export const GamePage: React.FC<Props> = ({ roomId, userId }) => {
 
             {activeTab === 'map' && <GameMapView currentStationName={currentStationName} sharedPosition={sharedPosition} />}
           </AnimatePresence>
-
-          {/* 🔑 ここに退出ボタンを追加！ */}
-          <QuitButton />
 
           <BottomNav activeTab={activeTab} onChangeTab={setActiveTab} />
         </>

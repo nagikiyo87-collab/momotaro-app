@@ -87,25 +87,34 @@ useEffect(() => {
         onClick={() => setStep('home')}
         style={{
           height: '100vh',
+          width: '100vw',
           display: 'flex',
           flexDirection: 'column',
           alignItems: 'center',
-          justifyContent: 'center',
-          background: 'linear-gradient(135deg, #ff9a9e 0%, #fecfef 100%)',
+          justifyContent: 'flex-end', // 🔑 文字を画面の下の方に配置
+          paddingBottom: '15vh',
+          backgroundImage: 'url(/home.png)', // 🔑 publicフォルダの画像を背景に設定！
+          backgroundSize: 'cover',           // 画面全体にフィットさせる
+          backgroundPosition: 'center',
+          backgroundRepeat: 'no-repeat',
           cursor: 'pointer',
           userSelect: 'none',
         }}
       >
-        <h1 style={{ fontSize: '2.5rem', marginBottom: '20px', textShadow: '2px 2px 4px rgba(0,0,0,0.2)' }}>
-          🍑 桃鉄すごろく 🍑
-        </h1>
-        <p style={{ fontSize: '1.2rem', animation: 'blink 1.5s infinite', fontWeight: 'bold' }}>
+        {/* 画像自体がタイトルの代わりになるので、TAP TO START だけを目立つように表示 */}
+        <p style={{ 
+          fontSize: '1.5rem', 
+          animation: 'blink 1.5s infinite', 
+          fontWeight: '900',
+          color: '#ffffff',
+          textShadow: '0 2px 10px rgba(0,0,0,0.8), 0 0 5px rgba(0,0,0,0.5)', // 画像と同化しないように影をつける
+          letterSpacing: '2px'
+        }}>
           — TAP TO START —
         </p>
       </div>
     );
   }
-
   // -------------------------------------------------------------
   // 画面②: ホーム画面（ゲームモード選択）
   // -------------------------------------------------------------
@@ -120,6 +129,11 @@ useEffect(() => {
           </button>
           <button style={{ ...primaryBtnStyle, opacity: 0.5, cursor: 'not-allowed' }} disabled>
             🤖 1人で遊ぶ（準備中）
+          </button>
+          
+          {/* 🔑 タイトルに戻るボタンを追加 */}
+          <button style={backBtnStyle} onClick={() => setStep('tap_start')}>
+            ⬅️ タイトルに戻る
           </button>
         </div>
       </div>

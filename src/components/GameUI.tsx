@@ -36,7 +36,7 @@ export const GameHeader: React.FC<{
           {copySuccess ? '✓ コピー完了' : '📋 ルームIDコピー'}
         </button>
         <button onClick={onOpenRule} style={{ width: '100%', background: '#f1c40f', color: '#d35400', border: 'none', padding: '6px 10px', borderRadius: '20px', fontSize: '0.8rem', fontWeight: 'bold', cursor: 'pointer', boxShadow: '0 2px 0 #f39c12' }}>
-          📖 ルール確認
+          ⚙️ メニュー
         </button>
       </div>
     </header>
@@ -420,7 +420,19 @@ export const BiddingPhaseUI: React.FC<{
                   {currentlySelectedProperty.type === 'limit' ? (
                     <>
                       <p style={{ margin: '0 0 10px 0', fontSize: '0.9rem', color: '#555', fontWeight: 'bold' }}>実際に使った金額（円）を入力してください</p>
-                      <input type="number" placeholder="例: 1200" style={{ width: '100%', padding: '15px', borderRadius: '8px', border: '3px solid #bdc3c7', fontSize: '1.2rem', fontWeight: '800', boxSizing: 'border-box', outline: 'none' }} value={bidAmount || ''} onChange={(e) => setBidAmount(Number(e.target.value))} />
+                      <input 
+                        type="text" 
+                        inputMode="numeric" 
+                        pattern="[0-9]*"
+                        placeholder="例: 1200" 
+                        style={{ width: '100%', padding: '15px', borderRadius: '8px', border: '3px solid #bdc3c7', fontSize: '1.2rem', fontWeight: '800', boxSizing: 'border-box', outline: 'none' }} 
+                        value={bidAmount || ''} 
+                        onChange={(e) => {
+                          // 🔑 数字以外（ハイフンやカンマなど）が入力されたら強制削除
+                          const val = e.target.value.replace(/[^0-9]/g, '');
+                          setBidAmount(val ? Number(val) : 0);
+                        }} 
+                      />
                     </>
                   ) : (
                     <p style={{ margin: '0', fontSize: '0.9rem', color: '#7f8c8d', background: '#f1f2f6', padding: '12px', borderRadius: '8px', fontWeight: 'bold' }}>※この物件は「固定値（{currentlySelectedProperty.price}円）」のため金額の入力は不要です。</p>
@@ -615,20 +627,53 @@ export const AnimatedRoulette: React.FC<{ isSpinning: boolean; result: number | 
     </div>
   );
 };
-// --- 新規追加: 退出ボタン UI ---
-export const QuitButton: React.FC = () => {
-  const handleQuit = () => {
-    if (window.confirm("ゲームを一時退出してホーム画面に戻りますか？\n（同じルームIDを入力すれば元の状態に復帰できます）")) {
-      localStorage.removeItem('savedRoomId');
-      window.location.href = '/?step=route_select';
-    }
-  };
-
+// --- ⑤.5 リアル出費入力 UI ---
+export const SpendingPhaseUI: React.FC<{
+  spentInput: string; setSpentInput: (val: string) => void;
+  mySpending: number | undefined; opponentSpending: number | undefined;
+  bothSubmitted: boolean; isMyTurn: boolean;
+  onSubmitSpending: () => void; onFinishSpending: () => void;
+}> = ({ spentInput, setSpentInput, mySpending, opponentSpending, bothSubmitted, isMyTurn, onSubmitSpending, onFinishSpending }) => {
   return (
-    <div style={{ textAlign: 'center', margin: '40px 0 100px 0' }}>
-      <button onClick={handleQuit} style={{ background: '#e74c3c', color: '#fff', border: 'none', padding: '12px 24px', borderRadius: '30px', fontSize: '1rem', fontWeight: 'bold', cursor: 'pointer', boxShadow: '0 4px 0 #c0392b' }}>
-        🚪 ゲームを一時退出する
-      </button>
-    </div>
+    <>
+      <h3 style={{ margin: '0 0 15px 0', color: '#e67e22', fontWeight: '800', fontSize: '1.3rem' }}>💸 リアル出費の入力</h3>
+      <div style={{ padding: '20px', background: '#fdf2e9', borderRadius: '16px', marginBottom: '15px', border: '4px solid #f39c12' }}>
+        {mySpending === undefined ? (
+          <div style={{ textAlign: 'left' }}>
+            <p style={{ margin: '0 0 10px 0', fontWeight: '800', fontSize: '1.05rem', color: '#2c3e50' }}>この駅での滞在中に、現実で使ったお金（飲食代や雑費など）を入力してください。</p>
+            <p style={{ margin: '0 0 15px 0', fontSize: '0.9rem', color: '#e74c3c', fontWeight: 'bold' }}>※使っていない場合は「0」と入力してください。</p>
+            <input 
+              type="text" 
+              inputMode="numeric" 
+              pattern="[0-9]*"
+              placeholder="例: 500 (使っていない場合は 0)" 
+              style={{ width: '100%', padding: '15px', borderRadius: '8px', border: '3px solid #bdc3c7', fontSize: '1.2rem', fontWeight: '800', boxSizing: 'border-box', outline: 'none', marginBottom: '20px' }} 
+              value={spentInput} 
+              onChange={(e) => {
+                // 🔑 数字以外が入力されたら強制的に消去する！
+                const val = e.target.value.replace(/[^0-9]/g, '');
+                setSpentInput(val);
+              }} 
+            />
+            <button className="btn-pop btn-orange" onClick={onSubmitSpending} style={{ width: '100%' }}>
+              確定する
+            </button>
+          </div>
+        ) : (
+          <div style={{ padding: '30px 20px', textAlign: 'center', background: '#fff', borderRadius: '16px', border: '4px solid #2ecc71', boxShadow: '0 8px 0 rgba(46,204,113,0.3)' }}>
+            <div style={{ fontSize: '3.5rem', marginBottom: '15px' }}>✅</div>
+            <p style={{ fontWeight: '800', color: '#27ae60', fontSize: '1.2rem', margin: '0 0 10px 0' }}>入力が完了しました！</p>
+            {opponentSpending === undefined && <p style={{ color: '#7f8c8d', fontSize: '1rem', fontWeight: 'bold', margin: 0 }}>相手の入力を待っています...</p>}
+          </div>
+        )}
+        
+        {bothSubmitted && isMyTurn && (
+          <div style={{ marginTop: '25px', borderTop: '3px dashed #f39c12', paddingTop: '20px' }}>
+            <p style={{ fontWeight: '800', color: '#e74c3c', fontSize: '1.2rem', marginBottom: '15px' }}>🎉 2人の入力が完了しました！</p>
+            <button className="btn-pop" onClick={onFinishSpending}>精算して「物件入札」へ</button>
+          </div>
+        )}
+      </div>
+    </>
   );
 };
