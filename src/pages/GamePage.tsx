@@ -3,7 +3,7 @@ import { useGameSync } from '../hooks/useGameSync';
 import { useTurnActions } from '../hooks/useTurnActions';
 import { STATIONS, STATION_PROPERTIES, MISSIONS, ITEMS } from '../data/gameData'; 
 import { RuleModal } from '../components/RuleModal';
-import { GameHeader, PlayerCards, GameMapView, BottomNav, MissionPhaseUI, BiddingPhaseUI, ResultPhaseUI, SeasonalBackground, AnimatedDice, AnimatedRoulette } from '../components/GameUI';
+import { GameHeader, PlayerCards, GameMapView, BottomNav, AnimatedDice, AnimatedRoulette, SeasonalBackground, MissionPhaseUI, BiddingPhaseUI, ResultPhaseUI, QuitButton } from '../components/GameUI';
 import { motion, AnimatePresence } from 'framer-motion';
 import '../styles/index.css'; 
 
@@ -127,7 +127,7 @@ export const GamePage: React.FC<Props> = ({ roomId, userId }) => {
                       <div style={{ marginBottom: '20px' }}>
                         <AnimatedDice 
                           isRolling={actions.isRollingDice} 
-                          result={actions.pendingDiceTotal !== null ? actions.pendingDiceTotal : actions.diceResult} 
+                          result={actions.diceResult} 
                         />
                       </div>
 
@@ -154,10 +154,9 @@ export const GamePage: React.FC<Props> = ({ roomId, userId }) => {
                       <div style={{ marginBottom: '20px' }}>
                         <AnimatedRoulette 
                           isSpinning={actions.isSpinningRoulette} 
-                          result={actions.pendingRouletteData !== null ? actions.pendingRouletteData.time : actions.rouletteResult} 
+                          result={actions.rouletteResult} 
                         />
                       </div>
-
                       {/* 🔑 ルーレットの結果が決まったら「ミッションへ進むボタン」に切り替わる！ */}
                       {actions.pendingRouletteData !== null ? (
                         <button className="btn-pop" onClick={actions.handleConfirmRoulette} disabled={!isMyTurn}>
@@ -222,6 +221,9 @@ export const GamePage: React.FC<Props> = ({ roomId, userId }) => {
 
             {activeTab === 'map' && <GameMapView currentStationName={currentStationName} sharedPosition={sharedPosition} />}
           </AnimatePresence>
+
+          {/* 🔑 ここに退出ボタンを追加！ */}
+          <QuitButton />
 
           <BottomNav activeTab={activeTab} onChangeTab={setActiveTab} />
         </>

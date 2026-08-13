@@ -16,48 +16,54 @@ export const GameHeader: React.FC<{
   onOpenRule: () => void; 
   currentStationName: string; 
   remainingStations: number;  
-}> = ({ currentYear, seasonLabel, roomId, copySuccess, onCopyRoomId, onOpenRule, currentStationName, remainingStations }) => (
-  <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', background: 'rgba(255, 255, 255, 0.95)', padding: '15px', borderRadius: '16px', boxShadow: '0 4px 12px rgba(0,0,0,0.08)', backdropFilter: 'blur(5px)' }}>
-    <div>
-      <div style={{ fontWeight: '900', color: '#2c3e50', fontSize: '1.3rem', marginBottom: '6px' }}>
-        {currentYear}年目 {seasonLabel}
+}> = ({ currentYear, seasonLabel, roomId, copySuccess, onCopyRoomId, onOpenRule, currentStationName, remainingStations }) => {
+  return (
+    <header style={{ position: 'sticky', top: '10px', zIndex: 100, display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', background: 'rgba(255, 255, 255, 0.95)', padding: '15px', borderRadius: '16px', boxShadow: '0 4px 12px rgba(0,0,0,0.08)', backdropFilter: 'blur(5px)' }}>
+      <div>
+        <div style={{ fontWeight: '900', color: '#2c3e50', fontSize: '1.3rem', marginBottom: '6px' }}>
+          {currentYear}年目 {seasonLabel}
+        </div>
+        <div style={{ fontSize: '0.9rem', color: '#e67e22', fontWeight: 'bold', background: '#fff3e0', padding: '6px 10px', borderRadius: '8px', display: 'inline-block' }}>
+          📍 {currentStationName} <span style={{ color: '#d35400', marginLeft: '5px', fontSize: '0.8rem' }}>(残り {remainingStations} マス)</span>
+        </div>
       </div>
-      <div style={{ fontSize: '0.9rem', color: '#e67e22', fontWeight: 'bold', background: '#fff3e0', padding: '6px 10px', borderRadius: '8px', display: 'inline-block' }}>
-        📍 {currentStationName} <span style={{ color: '#d35400', marginLeft: '5px', fontSize: '0.8rem' }}>(残り {remainingStations} マス)</span>
+      
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', alignItems: 'flex-end' }}>
+        <div style={{ fontSize: '0.8rem', color: '#7f8c8d', fontWeight: 'bold', letterSpacing: '1px' }}>
+          ルームID: {roomId}
+        </div>
+        <button onClick={onCopyRoomId} style={{ background: '#3498db', color: '#fff', border: 'none', padding: '6px 12px', borderRadius: '20px', fontSize: '0.8rem', fontWeight: 'bold', cursor: 'pointer', boxShadow: '0 2px 0 #2980b9', width: '100%' }}>
+          {copySuccess ? '✓ コピー完了' : '📋 ルームIDコピー'}
+        </button>
+        <button onClick={onOpenRule} style={{ width: '100%', background: '#f1c40f', color: '#d35400', border: 'none', padding: '6px 10px', borderRadius: '20px', fontSize: '0.8rem', fontWeight: 'bold', cursor: 'pointer', boxShadow: '0 2px 0 #f39c12' }}>
+          📖 ルール確認
+        </button>
       </div>
-    </div>
-    
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-      <div style={{ fontSize: '0.8rem', color: '#7f8c8d', fontWeight: 'bold', letterSpacing: '1px', textAlign: 'right' }}>
-        ルームID: {roomId}
-      </div>
-      <button onClick={onCopyRoomId} style={{ background: '#3498db', color: '#fff', border: 'none', padding: '6px 12px', borderRadius: '20px', fontSize: '0.8rem', fontWeight: 'bold', cursor: 'pointer', boxShadow: '0 2px 0 #2980b9' }}>
-        {copySuccess ? '✓ コピー完了' : '📋 ルームIDのコピー'}
-      </button>
-      <button onClick={onOpenRule} style={{ background: '#f1c40f', color: '#d35400', border: 'none', padding: '6px 12px', borderRadius: '20px', fontSize: '0.8rem', fontWeight: 'bold', cursor: 'pointer', boxShadow: '0 2px 0 #f39c12' }}>
-        📖 ルール確認
-      </button>
-    </div>
-  </header>
-);
-
+    </header>
+  );
+};
 // --- ② プレイヤーカード UI ---
 export const PlayerCards: React.FC<{
   me: any; opponent: any; isMyTurn: boolean; userId: string; opponentId: string | undefined;
   bombyPossessedId: string | null; bombyType: string; inviteUrl: string;
 }> = ({ me, opponent, isMyTurn, userId, opponentId, bombyPossessedId, bombyType, inviteUrl }) => {
+  // 🔑 publicフォルダの画像を返す関数
+  const getBombyImageUrl = (type: string) => {
+    if (type === 'king') return '/bomby-king.png';
+    if (type === 'petit') return '/bomby-petit.png';
+    return '/bomby-normal.png';
+  };
+  // アイコンは名前の横用に残す
   const getBombyIcon = (type: string) => type === 'king' ? '👑' : type === 'petit' ? '👼' : '😈';
 
-  // 🔑 タップされたプレイヤーの詳細を表示するためのステート
   const [detailPlayer, setDetailPlayer] = useState<'me' | 'opponent' | null>(null);
 
-  // 🔑 詳細モーダルを描画する関数
+  // 🔑 消えてしまっていた詳細モーダルの処理を復活！
   const renderDetailModal = () => {
     if (!detailPlayer) return null;
     const player = detailPlayer === 'me' ? me : opponent;
     const isMe = detailPlayer === 'me';
     
-    // アイテムIDの配列からアイテムの詳細データを取得
     const playerItems = (player?.items || []).map((id: string) => ITEMS.find(i => i.id === id)).filter(Boolean);
     const playerProperties = player?.properties || [];
 
@@ -111,49 +117,65 @@ export const PlayerCards: React.FC<{
 
   return (
     <>
-      {/* モーダルの描画（非表示時は何も出ません） */}
       {renderDetailModal()}
 
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: '15px', marginBottom: '25px' }}>
+        
+        {/* --- あなたのカード --- */}
         <div 
-          onClick={() => setDetailPlayer('me')} // 🔑 タップで開く
-          style={{ flex: 1, background: '#ffffff', padding: '20px 15px', borderRadius: '16px', textAlign: 'center', border: isMyTurn ? '4px solid #ff4757' : '4px solid #dcdde1', boxShadow: isMyTurn ? '0 8px 0 rgba(255,71,87,0.3)' : '0 6px 0 rgba(0,0,0,0.1)', transform: isMyTurn ? 'translateY(-4px)' : 'none', transition: 'all 0.2s', cursor: 'pointer' }}
+          onClick={() => setDetailPlayer('me')} 
+          style={{ flex: 1, position: 'relative', overflow: 'hidden', background: '#ffffff', padding: '20px 15px', borderRadius: '16px', textAlign: 'center', border: isMyTurn ? '4px solid #ff4757' : '4px solid #dcdde1', boxShadow: isMyTurn ? '0 8px 0 rgba(255,71,87,0.3)' : '0 6px 0 rgba(0,0,0,0.1)', transform: isMyTurn ? 'translateY(-4px)' : 'none', transition: 'all 0.2s', cursor: 'pointer' }}
         >
-          <h3 style={{ margin: '0 0 10px 0', fontSize: '1.1rem', color: '#2f3542', fontWeight: '800' }}>
-            👤 {me?.name || 'あなた'} {bombyPossessedId === userId && <span title="貧乏神が憑依中！">{getBombyIcon(bombyType)}</span>}
-          </h3>
-          <p style={{ margin: '5px 0', color: (me?.money || 0) < 0 ? '#e74c3c' : '#27ae60', fontWeight: '800', fontSize: '1.3rem' }}>💰 {me?.money?.toLocaleString() || 3000}円</p>
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.9rem', color: '#747d8c', marginTop: '10px', background: '#f1f2f6', padding: '6px 10px', borderRadius: '8px', fontWeight: 'bold' }}>
-            <span>🏠 {me?.properties?.length || 0}件</span>
-            <span>🎒 {me?.items?.length || 0}/3 個</span>
+          {/* 🔑 背景画像としてボンビーを表示（半透明） */}
+          {bombyPossessedId === userId && (
+            <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, opacity: 0.3, backgroundImage: `url(${getBombyImageUrl(bombyType)})`, backgroundSize: 'cover', backgroundPosition: 'center', backgroundRepeat: 'no-repeat', pointerEvents: 'none', zIndex: 0 }} />
+          )}
+          
+          <div style={{ position: 'relative', zIndex: 1 }}>
+            <h3 style={{ margin: '0 0 10px 0', fontSize: '1.1rem', color: '#2f3542', fontWeight: '800' }}>
+              👤 {me?.name || 'あなた'} {bombyPossessedId === userId && <span title="貧乏神が憑依中！">{getBombyIcon(bombyType)}</span>}
+            </h3>
+            <p style={{ margin: '5px 0', color: (me?.money || 0) < 0 ? '#e74c3c' : '#27ae60', fontWeight: '800', fontSize: '1.3rem' }}>💰 {me?.money?.toLocaleString() || 3000}円</p>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.9rem', color: '#747d8c', marginTop: '10px', background: 'rgba(241, 242, 246, 0.8)', padding: '6px 10px', borderRadius: '8px', fontWeight: 'bold' }}>
+              <span>🏠 {me?.properties?.length || 0}件</span>
+              <span>🎒 {me?.items?.length || 0}/3 個</span>
+            </div>
           </div>
         </div>
 
+        {/* --- 相手のカード --- */}
         <div 
-          onClick={() => { if (opponent) setDetailPlayer('opponent') }} // 🔑 相手がいればタップで開く
-          style={{ flex: 1, background: '#ffffff', padding: '20px 15px', borderRadius: '16px', textAlign: 'center', border: !isMyTurn && opponent ? '4px solid #ff4757' : '4px solid #dcdde1', opacity: opponent ? 1 : 0.6, boxShadow: !isMyTurn && opponent ? '0 8px 0 rgba(255,71,87,0.3)' : '0 6px 0 rgba(0,0,0,0.1)', transform: !isMyTurn && opponent ? 'translateY(-4px)' : 'none', transition: 'all 0.2s', cursor: opponent ? 'pointer' : 'default' }}
+          onClick={() => { if (opponent) setDetailPlayer('opponent') }} 
+          style={{ flex: 1, position: 'relative', overflow: 'hidden', background: '#ffffff', padding: '20px 15px', borderRadius: '16px', textAlign: 'center', border: !isMyTurn && opponent ? '4px solid #ff4757' : '4px solid #dcdde1', opacity: opponent ? 1 : 0.6, boxShadow: !isMyTurn && opponent ? '0 8px 0 rgba(255,71,87,0.3)' : '0 6px 0 rgba(0,0,0,0.1)', transform: !isMyTurn && opponent ? 'translateY(-4px)' : 'none', transition: 'all 0.2s', cursor: opponent ? 'pointer' : 'default' }}
         >
-          <h3 style={{ margin: '0 0 10px 0', fontSize: '1.1rem', color: '#2f3542', fontWeight: '800' }}>
-            {opponent ? `👤 ${opponent.name}` : '👤 あいて'} {bombyPossessedId === opponentId && <span title="貧乏神が憑依中！">{getBombyIcon(bombyType)}</span>}
-          </h3>
-          {!opponent ? (
-            <div style={{ margin: '15px 0' }}><QRCodeSVG value={inviteUrl} size={90} /></div>
-          ) : (
-            <>
-              <p style={{ margin: '5px 0', color: (opponent?.money || 0) < 0 ? '#e74c3c' : '#27ae60', fontWeight: '800', fontSize: '1.3rem' }}>💰 {opponent?.money?.toLocaleString() || 3000}円</p>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.9rem', color: '#747d8c', marginTop: '10px', background: '#f1f2f6', padding: '6px 10px', borderRadius: '8px', fontWeight: 'bold' }}>
-                <span>🏠 {opponent?.properties?.length || 0}件</span>
-                <span>🎒 {opponent?.items?.length || 0}/3 個</span>
-              </div>
-            </>
+          {/* 🔑 背景画像としてボンビーを表示（半透明） */}
+          {bombyPossessedId === opponentId && opponent && (
+            <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, opacity: 0.3, backgroundImage: `url(${getBombyImageUrl(bombyType)})`, backgroundSize: 'cover', backgroundPosition: 'center', backgroundRepeat: 'no-repeat', pointerEvents: 'none', zIndex: 0 }} />
           )}
+
+          <div style={{ position: 'relative', zIndex: 1 }}>
+            <h3 style={{ margin: '0 0 10px 0', fontSize: '1.1rem', color: '#2f3542', fontWeight: '800' }}>
+              {opponent ? `👤 ${opponent.name}` : '👤 あいて'} {bombyPossessedId === opponentId && <span title="貧乏神が憑依中！">{getBombyIcon(bombyType)}</span>}
+            </h3>
+            {!opponent ? (
+              <div style={{ margin: '15px 0' }}><QRCodeSVG value={inviteUrl} size={90} /></div>
+            ) : (
+              <>
+                <p style={{ margin: '5px 0', color: (opponent?.money || 0) < 0 ? '#e74c3c' : '#27ae60', fontWeight: '800', fontSize: '1.3rem' }}>💰 {opponent?.money?.toLocaleString() || 3000}円</p>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.9rem', color: '#747d8c', marginTop: '10px', background: 'rgba(241, 242, 246, 0.8)', padding: '6px 10px', borderRadius: '8px', fontWeight: 'bold' }}>
+                  <span>🏠 {opponent?.properties?.length || 0}件</span>
+                  <span>🎒 {opponent?.items?.length || 0}/3 個</span>
+                </div>
+              </>
+            )}
+          </div>
         </div>
       </div>
     </>
   );
 };
 
-// --- ③ マップ UI ---
+// --- 以下（③マップ以降）は変更なしでそのまま ---
 export const GameMapView: React.FC<{ currentStationName: string; sharedPosition: number }> = ({ currentStationName, sharedPosition }) => (
   <motion.div initial={{ x: 20, opacity: 0 }} animate={{ x: 0, opacity: 1 }} exit={{ x: 20, opacity: 0 }} transition={{ duration: 0.2 }} style={{ padding: '20px', background: '#e1efc3', borderRadius: '16px', minHeight: '70vh', border: '4px solid #badc58', position: 'relative', overflow: 'hidden' }}>
     <div style={{ textAlign: 'center', marginBottom: '40px', position: 'relative', zIndex: 10 }}>
@@ -205,7 +227,6 @@ export const GameMapView: React.FC<{ currentStationName: string; sharedPosition:
   </motion.div>
 );
 
-// --- ④ ボトムナビ UI ---
 export const BottomNav: React.FC<{ activeTab: 'main' | 'map'; onChangeTab: (tab: 'main' | 'map') => void }> = ({ activeTab, onChangeTab }) => (
   <div style={{ position: 'fixed', bottom: 0, left: 0, width: '100%', backgroundColor: '#fff', borderTop: '3px solid #ecf0f1', display: 'flex', justifyContent: 'space-evenly', padding: '10px 0', zIndex: 100, boxShadow: '0 -4px 15px rgba(0,0,0,0.05)', paddingBottom: 'calc(10px + env(safe-area-inset-bottom))' }}>
     <div onClick={() => onChangeTab('main')} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flex: 1, cursor: 'pointer', color: activeTab === 'main' ? '#e74c3c' : '#7f8c8d' }}>
@@ -220,7 +241,6 @@ export const BottomNav: React.FC<{ activeTab: 'main' | 'map'; onChangeTab: (tab:
   </div>
 );
 
-// --- 新規追加: 完全同期型ミッション用タイマーコンポーネント ---
 const MissionTimer: React.FC<{ roomId: string; stayTime: number; timerData: any }> = ({ roomId, stayTime, timerData }) => {
   const [displayTime, setDisplayTime] = useState(stayTime * 60);
 
@@ -230,16 +250,14 @@ const MissionTimer: React.FC<{ roomId: string; stayTime: number; timerData: any 
       return;
     }
 
-    // 🔑 動いている場合は、現在時刻と終了予定時刻から残り時間を計算し続ける（閉じてもズレない！）
     if (timerData.isRunning && timerData.endTime) {
       const interval = window.setInterval(() => {
         const now = Date.now();
         const diff = Math.max(0, Math.floor((timerData.endTime - now) / 1000));
         setDisplayTime(diff);
-      }, 200); // 0.2秒ごとに画面を更新
+      }, 200);
       return () => window.clearInterval(interval);
     } else {
-      // 止まっている場合は、保存されている残り時間を表示
       setDisplayTime(timerData.remainingSeconds ?? stayTime * 60);
     }
   }, [timerData, stayTime]);
@@ -247,12 +265,10 @@ const MissionTimer: React.FC<{ roomId: string; stayTime: number; timerData: any 
   const handleToggle = async () => {
     const ref = doc(db, 'rooms', roomId);
     if (timerData?.isRunning) {
-      // ⏸ 一時停止：現在時刻から残り時間を逆算して保存
       const now = Date.now();
       const remaining = Math.max(0, Math.floor(((timerData.endTime || now) - now) / 1000));
       await updateDoc(ref, { 'missionTimer.isRunning': false, 'missionTimer.remainingSeconds': remaining });
     } else {
-      // ▶️ スタート：現在の残り時間から「終了予定時刻（絶対時間）」を計算して保存
       const currentRemaining = timerData?.remainingSeconds ?? stayTime * 60;
       const endTime = Date.now() + currentRemaining * 1000;
       await updateDoc(ref, { 'missionTimer.isRunning': true, 'missionTimer.endTime': endTime, 'missionTimer.remainingSeconds': currentRemaining });
@@ -286,9 +302,8 @@ const MissionTimer: React.FC<{ roomId: string; stayTime: number; timerData: any 
   );
 };
 
-// --- ⑤ ミッション詳細 UI ---
 export const MissionPhaseUI: React.FC<{
-  roomId: string; timerData: any; // 🔑 追加
+  roomId: string; timerData: any;
   currentStationName: string; stayTime: number; squareType: string;
   myMission: Mission | undefined; opponentMission: Mission | undefined; opponentName: string;
   isMyTurn: boolean; onEndMission: (mySuccess: boolean, opSuccess: boolean) => void;
@@ -304,11 +319,7 @@ export const MissionPhaseUI: React.FC<{
   return (
     <>
       <h3 style={{ margin: '0 0 15px 0', color: '#3498db', fontWeight: '800', fontSize: '1.3rem' }}>🏙️ ミッションタイム！</h3>
-      
-      {/* 🔑 タイマーに roomId と timerData を渡す */}
       <MissionTimer roomId={roomId} stayTime={stayTime} timerData={timerData} />
-
-      {/* --- これより下は以前と同じなのでそのまま残します --- */}
       <div style={{ padding: '20px', background: '#e1f5fe', borderRadius: '16px', marginBottom: '15px', border: '4px solid #81d4fa' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
           <span style={{ fontWeight: '800', color: '#2c3e50', fontSize: '1.2rem' }}>📍 {currentStationName}</span>
@@ -356,7 +367,7 @@ export const MissionPhaseUI: React.FC<{
     </>
   );
 };
-// --- ⑥ 入札 UI ---
+
 export const BiddingPhaseUI: React.FC<{
   stayTime: number; currentProperties: Property[];
   selectedPropertyId: string; setSelectedPropertyId: (id: string) => void;
@@ -373,14 +384,12 @@ export const BiddingPhaseUI: React.FC<{
       <h3 style={{ margin: '0 0 15px 0', color: '#9b59b6', fontWeight: '800', fontSize: '1.3rem' }}>🛍️ 物件シークレット入札</h3>
       <div style={{ padding: '20px', background: '#f5eef8', borderRadius: '16px', marginBottom: '15px', border: '4px solid #d2b4de' }}>
         
-        {/* 🔑 使われていなかった stayTime（残り滞在時間）の表示を復活！ */}
         <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '15px' }}>
           <span style={{ fontWeight: '800', color: '#e74c3c', fontSize: '1.1rem', background: '#fff', padding: '6px 12px', borderRadius: '10px', border: '3px solid #ff7675' }}>
             ⏱️ 残り滞在: {stayTime}分
           </span>
         </div>
 
-        {/* 借金状態のときのアラートとスキップ処理 */}
         {isBroke ? (
           <div style={{ background: '#ffefeb', padding: '20px', borderRadius: '12px', border: '3px solid #ff7675', marginBottom: '20px', textAlign: 'center' }}>
             <p style={{ color: '#d63031', fontWeight: '900', fontSize: '1.1rem', margin: '0 0 15px 0' }}>⚠️ 所持金が {myMoney}円 のため、入札に参加できません！</p>
@@ -391,7 +400,6 @@ export const BiddingPhaseUI: React.FC<{
             )}
           </div>
         ) : (
-          /* 正常時（お金がある時）のUI */
           !myBid ? (
             <div style={{ textAlign: 'left' }}>
               <p style={{ margin: '0 0 15px 0', fontWeight: '800', fontSize: '1.05rem', color: '#2c3e50' }}>どの物件を買いましたか？（所持金: {myMoney}円）</p>
@@ -445,7 +453,6 @@ export const BiddingPhaseUI: React.FC<{
   );
 };
 
-// --- ⑦ リザルト（結果発表）UI ---
 export const ResultPhaseUI: React.FC<{ me: any; opponent: any }> = ({ me, opponent }) => {
   const { triggerConfetti } = useModal(); 
   
@@ -465,11 +472,10 @@ export const ResultPhaseUI: React.FC<{ me: any; opponent: any }> = ({ me, oppone
     return { rank: '🥉 Cランク', reward: 'コンビニで好きなアイス＆ジュース奢り（数百円）' };
   };
 
-// 🔑 アプリを初期化してトップに戻る処理
-const handleGoHome = () => {
-  localStorage.removeItem('savedRoomId'); // 🔑 追加: 保存された部屋IDを消去する
-  window.location.href = '/'; 
-};
+  const handleGoHome = () => {
+    localStorage.removeItem('savedRoomId'); 
+    window.location.href = '/?step=route_select';
+  };
 
   const myTotal = calculateTotalAsset(me);
   const opTotal = calculateTotalAsset(opponent);
@@ -524,7 +530,6 @@ const handleGoHome = () => {
   );
 };
 
-// --- ⑧ 季節の背景 UI ---
 export const SeasonalBackground: React.FC<{ season: string }> = ({ season }) => {
   const themes = {
     spring: { bg: 'linear-gradient(135deg, #fff0f5 0%, #ffc3a0 100%)', icon: '🌸' },
@@ -551,7 +556,6 @@ export const SeasonalBackground: React.FC<{ season: string }> = ({ season }) => 
   );
 };
 
-// --- ⑨ サイコロ 3Dアニメーション UI ---
 export const AnimatedDice: React.FC<{ isRolling: boolean; result: number | null }> = ({ isRolling, result }) => {
   return (
     <div style={{ perspective: '800px', display: 'flex', justifyContent: 'center', alignItems: 'center', height: '120px' }}>
@@ -586,7 +590,6 @@ export const AnimatedDice: React.FC<{ isRolling: boolean; result: number | null 
   );
 };
 
-// --- ⑩ ルーレット スロットアニメーション UI ---
 export const AnimatedRoulette: React.FC<{ isSpinning: boolean; result: number | null }> = ({ isSpinning, result }) => {
   return (
     <div style={{ height: '100px', overflow: 'hidden', display: 'flex', justifyContent: 'center', alignItems: 'center', background: '#f8f9fa', borderRadius: '16px', border: '4px solid #ecf0f1', position: 'relative' }}>
@@ -609,6 +612,23 @@ export const AnimatedRoulette: React.FC<{ isSpinning: boolean; result: number | 
           )}
         </motion.div>
       )}
+    </div>
+  );
+};
+// --- 新規追加: 退出ボタン UI ---
+export const QuitButton: React.FC = () => {
+  const handleQuit = () => {
+    if (window.confirm("ゲームを一時退出してホーム画面に戻りますか？\n（同じルームIDを入力すれば元の状態に復帰できます）")) {
+      localStorage.removeItem('savedRoomId');
+      window.location.href = '/?step=route_select';
+    }
+  };
+
+  return (
+    <div style={{ textAlign: 'center', margin: '40px 0 100px 0' }}>
+      <button onClick={handleQuit} style={{ background: '#e74c3c', color: '#fff', border: 'none', padding: '12px 24px', borderRadius: '30px', fontSize: '1rem', fontWeight: 'bold', cursor: 'pointer', boxShadow: '0 4px 0 #c0392b' }}>
+        🚪 ゲームを一時退出する
+      </button>
     </div>
   );
 };

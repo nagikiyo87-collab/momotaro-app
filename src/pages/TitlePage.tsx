@@ -21,17 +21,22 @@ export const TitlePage: React.FC<Props> = ({ onHostGame, onJoinGame }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  // 🔑 追加：URLに ?roomId=XXXX が含まれている場合、自動で参加モード画面を開く！
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const urlRoomId = params.get('roomId');
-    
-    if (urlRoomId) {
-      setInputRoomId(urlRoomId.toUpperCase()); // ルームIDをセット
-      setStep('room_setup');                   // 部屋設定画面へスキップ
-      setMode('join');                         // 参加モードにする
-    }
-  }, []);
+// 🔑 追加：URLの情報を読み取って画面をスキップする処理
+useEffect(() => {
+  const params = new URLSearchParams(window.location.search);
+  const urlRoomId = params.get('roomId');
+  const stepParam = params.get('step'); // 🔑 追加：ステップの合図を受け取る
+  
+  if (urlRoomId) {
+    // 招待URLから来た場合
+    setInputRoomId(urlRoomId.toUpperCase());
+    setStep('room_setup');
+    setMode('join');
+  } else if (stepParam === 'route_select') {
+    // 🔑 追加：退出ボタン等から戻ってきた場合、ルート選択画面からスタート
+    setStep('route_select');
+  }
+}, []);
 
   // 1. 部屋を作る処理
   const handleHost = async () => {

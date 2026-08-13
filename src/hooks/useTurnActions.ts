@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { doc, updateDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { STATIONS, MISSIONS, ITEMS, type Mission, type Property } from '../data/gameData';
@@ -15,23 +15,67 @@ export const useTurnActions = (
   const modal = useModal(); 
   const { showAlert, showConfirm, triggerConfetti } = modal;
 
-  const [diceResult, setDiceResult] = useState<number | null>(null);
-  const [rouletteResult, setRouletteResult] = useState<number | null>(null);
   const [selectedPropertyId, setSelectedPropertyId] = useState<string>('');
   const [bidAmount, setBidAmount] = useState<number>(0);
   const [activeItemEffect, setActiveItemEffect] = useState<string | null>(null);
-  
-  const [isRollingDice, setIsRollingDice] = useState(false);
-  const [isSpinningRoulette, setIsSpinningRoulette] = useState(false);
 
-  // 🔑 決定した結果を一時保持するステート
-  const [pendingDiceTotal, setPendingDiceTotal] = useState<number | null>(null);
-  const [pendingRouletteData, setPendingRouletteData] = useState<{ time: number; squareType: string; myMissionId: string; opMissionId: string } | null>(null);
+  // 🔑 変更: ローカルのサイコロ・ルーレット状態は「DBにある値」を優先して使うようにする
+  const isRollingDice = roomData?.isRollingDice || false;
+  const pendingDiceTotal = roomData?.pendingDiceTotal ?? null;
+  const isSpinningRoulette = roomData?.isSpinningRoulette || false;
+  const pendingRouletteData = roomData?.pendingRouletteData ?? null;
+
+  // 画面に表示する「パラパラ変わる数字」用（これは通信せずローカルで回す）
+  const [displayDice, setDisplayDice] = useState<number | null>(null);
+  const [displayRoulette, setDisplayRoulette] = useState<number | null>(null);
 
   const sharedPosition = roomData?.sharedPosition || 0;
   const currentYear = roomData?.year || 1;
   const currentSeason = roomData?.season || 'spring';
   const bombyPossessedId = roomData?.bombyPossessedId;
+
+  // --- 🔑 サイコロの同期アニメーション処理 ---
+  useEffect(() => {
+    let interval: number;
+    if (isRollingDice && pendingDiceTotal !== null) {
+      // 誰かがサイコロを振って、結果がDBにセットされた！ => アニメーション開始
+      let count = 0;
+      const maxCount = 20;
+      interval = window.setInterval(() => {
+        setDisplayDice(Math.floor(Math.random() * 6) + 1);
+        count++;
+        if (count >= maxCount) {
+          window.clearInterval(interval);
+          setDisplayDice(pendingDiceTotal); // 最後はDBに保存された結果でピタッと止める
+        }
+      }, 50);
+    } else if (!isRollingDice && pendingDiceTotal === null) {
+      // サイコロフェーズが終わったら表示をリセット
+      setDisplayDice(null);
+    }
+    return () => window.clearInterval(interval);
+  }, [isRollingDice, pendingDiceTotal]);
+
+  // --- 🔑 ルーレットの同期アニメーション処理 ---
+  useEffect(() => {
+    let interval: number;
+    if (isSpinningRoulette && pendingRouletteData !== null) {
+      // 誰かがルーレットを回した！ => アニメーション開始
+      let count = 0;
+      const maxCount = 20;
+      interval = window.setInterval(() => {
+        setDisplayRoulette(STAY_TIMES[Math.floor(Math.random() * STAY_TIMES.length)]);
+        count++;
+        if (count >= maxCount) {
+          window.clearInterval(interval);
+          setDisplayRoulette(pendingRouletteData.time); // 最後は結果で止める
+        }
+      }, 50);
+    } else if (!isSpinningRoulette && pendingRouletteData === null) {
+      setDisplayRoulette(null);
+    }
+    return () => window.clearInterval(interval);
+  }, [isSpinningRoulette, pendingRouletteData]);
 
   const processDebtAndSales = (initialMoney: number, properties: Property[], moneyChange: number) => {
     let newMoney = initialMoney + moneyChange;
@@ -49,59 +93,46 @@ export const useTurnActions = (
     return { newMoney, remainingProperties, soldNames };
   };
 
-  // --- サイコロ処理（アニメーションして結果で止まる） ---
+  // --- サイコロを振るボタンを押した時 ---
   const handleRollDice = async () => {
     if (!opponentId || isRollingDice || pendingDiceTotal !== null) return;
-    setIsRollingDice(true);
-
+    
+    // ① 出目を先に計算する
     let roll = Math.floor(Math.random() * 6) + 1;
     let finalTotal = roll;
-    
-    if (activeItemEffect === 'i_dice_plus2') {
-      finalTotal = roll + 2; 
-    } else if (activeItemEffect === 'i_dice_double') {
+    if (activeItemEffect === 'i_dice_plus2') finalTotal = roll + 2; 
+    else if (activeItemEffect === 'i_dice_double') {
       const roll2 = Math.floor(Math.random() * 6) + 1;
       finalTotal = roll + roll2;
     }
 
-    let count = 0;
-    const maxCount = 20; 
-    const interval = setInterval(() => {
-      setDiceResult(Math.floor(Math.random() * (activeItemEffect === 'i_dice_double' ? 12 : 6)) + 1);
-      count++;
-      
-      if (count >= maxCount) {
-        clearInterval(interval);
-        setDiceResult(finalTotal);       // 画面に確定した出目を表示
-        setPendingDiceTotal(finalTotal); // 確定値を保持
-        setIsRollingDice(false);
-      }
-    }, 50);
+    // ② DBに「サイコロ回ってるよ！結果はコレだよ！」と書き込む（相手の画面も動き出す）
+    await updateDoc(doc(db, 'rooms', roomId), {
+      isRollingDice: true,
+      pendingDiceTotal: finalTotal
+    });
   };
 
-  // 🔑 タップして次へ進む（サイコロ確定）
+  // 次へ進む（サイコロ確定）
   const handleConfirmMove = async () => {
     if (pendingDiceTotal === null) return;
     
     let itemMessage = '';
-    if (activeItemEffect === 'i_dice_plus2') {
-      itemMessage = `🎲 ダイス+2カードの効果が適用されました！`;
-    } else if (activeItemEffect === 'i_dice_double') {
-      itemMessage = `🎲 サイコロ2個振りの効果が適用されました！`;
-    }
+    if (activeItemEffect === 'i_dice_plus2') itemMessage = `🎲 ダイス+2カードの効果が適用されました！`;
+    else if (activeItemEffect === 'i_dice_double') itemMessage = `🎲 サイコロ2個振りの効果が適用されました！`;
     if (itemMessage) await showAlert(itemMessage);
 
     let nextPosition = sharedPosition + pendingDiceTotal;
     if (nextPosition >= STATIONS.length - 1) nextPosition = STATIONS.length - 1;
     
+    // DBからアニメーション用の一時データを消して、フェーズを進める
     await updateDoc(doc(db, 'rooms', roomId), { 
       sharedPosition: nextPosition, 
       lastDiceRoll: pendingDiceTotal, 
-      phase: 'roulette' 
+      phase: 'roulette',
+      isRollingDice: false,
+      pendingDiceTotal: null
     });
-    
-    setDiceResult(null);
-    setPendingDiceTotal(null);
     setActiveItemEffect(null);
   };
 
@@ -136,15 +167,13 @@ export const useTurnActions = (
     await updateDoc(doc(db, 'rooms', roomId), { [`players.${userId}.items`]: newItems });
   };
 
-  // --- ルーレット処理（アニメーションして結果で止まる） ---
+  // --- ルーレットを回すボタンを押した時 ---
   const handleSpinRoulette = async () => {
     if (!opponentId || isSpinningRoulette || pendingRouletteData !== null) return;
-    setIsSpinningRoulette(true);
-
+    
     const timeResult = STAY_TIMES[Math.floor(Math.random() * STAY_TIMES.length)];
     const squareTypes = ['blue', 'red', 'green', 'yellow'] as const;
     let chosenType: typeof squareTypes[number] = squareTypes[Math.floor(Math.random() * squareTypes.length)];
-
     let targetMissions = MISSIONS.filter(m => m.type === chosenType);
     if (chosenType === 'yellow') targetMissions = MISSIONS; 
 
@@ -159,44 +188,29 @@ export const useTurnActions = (
       opponentMissionObj = otherMissions.length > 0 ? otherMissions[Math.floor(Math.random() * otherMissions.length)] : myMissionObj;
     }
 
-    let count = 0;
-    const maxCount = 20; 
-    const interval = setInterval(() => {
-      setRouletteResult(STAY_TIMES[Math.floor(Math.random() * STAY_TIMES.length)]);
-      count++;
-      
-      if (count >= maxCount) {
-        clearInterval(interval);
-        setRouletteResult(timeResult); // 画面に確定した時間を表示
-        setPendingRouletteData({
-          time: timeResult,
-          squareType: chosenType,
-          myMissionId: myMissionObj.id,
-          opMissionId: opponentMissionObj.id
-        });
-        setIsSpinningRoulette(false);
+    // DBに「ルーレット回ってるよ！結果はコレだよ！」と書き込む
+    await updateDoc(doc(db, 'rooms', roomId), {
+      isSpinningRoulette: true,
+      pendingRouletteData: {
+        time: timeResult, squareType: chosenType,
+        myMissionId: myMissionObj.id, opMissionId: opponentMissionObj.id
       }
-    }, 50);
+    });
   };
 
-  // 🔑 タップして次へ進む（ルーレット確定）
+  // 次へ進む（ルーレット確定）
   const handleConfirmRoulette = async () => {
     if (!pendingRouletteData || !opponentId) return;
 
     await updateDoc(doc(db, 'rooms', roomId), {
       stayTime: pendingRouletteData.time, 
       squareType: pendingRouletteData.squareType, 
-      currentMissions: { 
-        [userId]: pendingRouletteData.myMissionId, 
-        [opponentId]: pendingRouletteData.opMissionId 
-      }, 
+      currentMissions: { [userId]: pendingRouletteData.myMissionId, [opponentId]: pendingRouletteData.opMissionId }, 
       phase: 'mission',
-      // 🔑 ミッション開始時に、共有タイマーの初期状態をセットする！
-      missionTimer: { isRunning: false, remainingSeconds: pendingRouletteData.time * 60, endTime: null }
+      missionTimer: { isRunning: false, remainingSeconds: pendingRouletteData.time * 60, endTime: null },
+      isSpinningRoulette: false,
+      pendingRouletteData: null
     });
-    
-    setRouletteResult(null); 
-    setPendingRouletteData(null);
   };
 
   const handleEndMission = async (mySuccess: boolean, opponentSuccess: boolean, myMission?: Mission | null, opponentMission?: Mission | null) => {
@@ -220,63 +234,40 @@ export const useTurnActions = (
 
     if (actualMySuccess) {
       let reward = myMission.reward || 0;
-      if (activeItemEffect === 'i_reward_double') {
-        reward *= 2;
-        myItemMsg += `\n💰 報酬2倍カードの効果で獲得金額が2倍！`;
-      }
+      if (activeItemEffect === 'i_reward_double') { reward *= 2; myItemMsg += `\n💰 報酬2倍カードの効果で獲得金額が2倍！`; }
       if (myMission.type === 'blue') myMoneyChange += reward;
-      if (myMission.type === 'green') { 
-        myMoneyChange += reward; 
-        opponentMoneyChange += myMission.reward; 
-      }
+      if (myMission.type === 'green') { myMoneyChange += reward; opponentMoneyChange += myMission.reward; }
     } else {
       if (myMission.type === 'red') {
         if (myMission.penaltyType === 'half_money') {
           const currentMoney = me?.money || 0;
-          if (currentMoney > 0) {
-            const lostAmount = Math.ceil(currentMoney / 2);
-            myMoneyChange -= lostAmount;
-            myItemMsg += `\n💸 所持金半減ペナルティ: -${lostAmount}円`;
-          }
-        } else {
-          myMoneyChange -= myMission.penalty;
-        }
+          if (currentMoney > 0) { const lostAmount = Math.ceil(currentMoney / 2); myMoneyChange -= lostAmount; myItemMsg += `\n💸 所持金半減ペナルティ: -${lostAmount}円`; }
+        } else { myMoneyChange -= myMission.penalty; }
       }
     }
 
     if (opponentSuccess) {
       if (opponentMission.type === 'blue') opponentMoneyChange += opponentMission.reward;
-      if (opponentMission.type === 'green' && myMission.type !== 'green') { 
-        myMoneyChange += opponentMission.reward; 
-        opponentMoneyChange += opponentMission.reward; 
-      }
+      if (opponentMission.type === 'green' && myMission.type !== 'green') { myMoneyChange += opponentMission.reward; opponentMoneyChange += opponentMission.reward; }
     } else {
       if (opponentMission.type === 'red') {
         if (opponentMission.penaltyType === 'half_money') {
           const opCurrentMoney = opponent?.money || 0;
-          if (opCurrentMoney > 0) {
-            const lostAmount = Math.ceil(opCurrentMoney / 2);
-            opponentMoneyChange -= lostAmount;
-            opponentItemMsg += `\n💸 所持金半減ペナルティ: -${lostAmount}円`;
-          }
-        } else {
-          opponentMoneyChange -= opponentMission.penalty;
-        }
+          if (opCurrentMoney > 0) { const lostAmount = Math.ceil(opCurrentMoney / 2); opponentMoneyChange -= lostAmount; opponentItemMsg += `\n💸 所持金半減ペナルティ: -${lostAmount}円`; }
+        } else { opponentMoneyChange -= opponentMission.penalty; }
       }
     }
 
     if (roomData?.squareType === 'yellow') {
       if (actualMySuccess) {
         const idx = Math.floor(Math.random() * availableItems.length);
-        const randomItem = availableItems[idx]; availableItems.splice(idx, 1); 
-        myNewItems.push(randomItem.id); 
+        const randomItem = availableItems[idx]; availableItems.splice(idx, 1); myNewItems.push(randomItem.id); 
         myItemMsg += `\n🎁 アイテムマス効果:「${randomItem.name}」をGET！`; 
         if (myNewItems.length > 3) myItemMsg += `\n⚠️ カバンがいっぱいです！次へ進む前に1つ捨ててください。`;
       }
       if (opponentSuccess) {
         const idx = Math.floor(Math.random() * availableItems.length);
-        const randomItem = availableItems[idx]; availableItems.splice(idx, 1); 
-        opponentNewItems.push(randomItem.id); 
+        const randomItem = availableItems[idx]; availableItems.splice(idx, 1); opponentNewItems.push(randomItem.id); 
         opponentItemMsg += `\n🎁 アイテムマス効果:「${randomItem.name}」をGET！`; 
         if (opponentNewItems.length > 3) opponentItemMsg += `\n⚠️ 相手のカバンがいっぱいになりました。`;
       }
@@ -426,9 +417,12 @@ export const useTurnActions = (
   };
 
   return {
-    diceResult, rouletteResult, selectedPropertyId, setSelectedPropertyId, bidAmount, setBidAmount, activeItemEffect, setActiveItemEffect,
+    // 🔑 UI側に渡す値を「DBから持ってきた値（displayDiceなど）」に変更！
+    diceResult: displayDice, 
+    rouletteResult: displayRoulette, 
+    selectedPropertyId, setSelectedPropertyId, bidAmount, setBidAmount, activeItemEffect, setActiveItemEffect,
     isRollingDice, isSpinningRoulette,
-    pendingDiceTotal, pendingRouletteData, // 🔑 追加
+    pendingDiceTotal, pendingRouletteData,
     handleRollDice, handleConfirmMove, handleUseItem, handleDiscardItem, 
     handleSpinRoulette, handleConfirmRoulette, handleEndMission, handleSubmitBid, handleRevealBids, handleBombyAction,
   };
