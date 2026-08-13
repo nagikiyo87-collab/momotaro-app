@@ -78,7 +78,7 @@ useEffect(() => {
     ? `${window.location.origin}?roomId=${createdRoomId}`
     : '';
 
-  // -------------------------------------------------------------
+// -------------------------------------------------------------
   // 画面①: タップしてスタート
   // -------------------------------------------------------------
   if (step === 'tap_start') {
@@ -86,28 +86,30 @@ useEffect(() => {
       <div 
         onClick={() => setStep('home')}
         style={{
-          height: '100vh',
-          width: '100vw',
+          height: '100dvh', // 🔑 vh から dvh に変更（スマホのアドレスバーの影響を防ぐ）
+          width: '100%',    // 🔑 vw から % に変更（横揺れ防止）
           display: 'flex',
           flexDirection: 'column',
           alignItems: 'center',
-          justifyContent: 'flex-end', // 🔑 文字を画面の下の方に配置
+          justifyContent: 'flex-end',
           paddingBottom: '15vh',
-          backgroundImage: 'url(/home.png)', // 🔑 publicフォルダの画像を背景に設定！
-          backgroundSize: 'cover',           // 画面全体にフィットさせる
+          backgroundImage: 'url(/home.png)',
+          
+          // 🔑 もし画像の両端が切れてしまうのが嫌な場合は、'cover' を 'contain' に変えてみてください
+          backgroundSize: 'cover', 
+          
           backgroundPosition: 'center',
           backgroundRepeat: 'no-repeat',
           cursor: 'pointer',
           userSelect: 'none',
         }}
       >
-        {/* 画像自体がタイトルの代わりになるので、TAP TO START だけを目立つように表示 */}
         <p style={{ 
           fontSize: '1.5rem', 
           animation: 'blink 1.5s infinite', 
           fontWeight: '900',
           color: '#ffffff',
-          textShadow: '0 2px 10px rgba(0,0,0,0.8), 0 0 5px rgba(0,0,0,0.5)', // 画像と同化しないように影をつける
+          textShadow: '0 2px 10px rgba(0,0,0,0.8), 0 0 5px rgba(0,0,0,0.5)', 
           letterSpacing: '2px'
         }}>
           — TAP TO START —
