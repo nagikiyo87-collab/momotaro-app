@@ -1,0 +1,22 @@
+{
+    "short_name": "桃鉄リアル",
+    "name": "リアル体験すごろく - 桃鉄アプリ",
+    "icons": [
+      {
+        "src": "/icons/pwa-192x192.png",
+        "type": "image/png",
+        "sizes": "192x192"
+      },
+      {
+        "src": "/icons/pwa-512x512.png",
+        "type": "image/png",
+        "sizes": "512x512",
+        "purpose": "any maskable"
+      }
+    ],
+    "start_url": "/?step=route_select",
+    "background_color": "#ffffff",
+    "theme_color": "#ff4757",
+    "display": "standalone",
+    "orientation": "portrait"
+  }
