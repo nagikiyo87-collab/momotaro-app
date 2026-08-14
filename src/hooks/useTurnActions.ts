@@ -18,10 +18,13 @@ export const useTurnActions = (
   const [selectedPropertyId, setSelectedPropertyId] = useState<string>('');
   const [bidAmount, setBidAmount] = useState<number>(0);
   const [activeItemEffect, setActiveItemEffect] = useState<string | null>(null);
-
-  // 🔑 リアル出費入力用
   const [spentInput, setSpentInput] = useState<string>('');
+  
+  const [dest1, setDest1] = useState<string>('');
+  const [dest2, setDest2] = useState<string>('');
+  const [dest3, setDest3] = useState<string>('');
 
+  const isMyTurn = roomData?.currentTurn === userId; 
   const isRollingDice = roomData?.isRollingDice || false;
   const pendingDiceTotal = roomData?.pendingDiceTotal ?? null;
   const isSpinningRoulette = roomData?.isSpinningRoulette || false;
@@ -38,7 +41,6 @@ export const useTurnActions = (
   const [isAnimatingDice, setIsAnimatingDice] = useState(false);
   const [isAnimatingRoulette, setIsAnimatingRoulette] = useState(false);
 
-  // --- サイコロの同期アニメーション処理 ---
   useEffect(() => {
     let interval: number;
     if (isRollingDice && pendingDiceTotal !== null) {
@@ -61,7 +63,6 @@ export const useTurnActions = (
     return () => window.clearInterval(interval);
   }, [isRollingDice, pendingDiceTotal]);
 
-  // --- ルーレットの同期アニメーション処理 ---
   useEffect(() => {
     let interval: number;
     if (isSpinningRoulette && pendingRouletteData !== null) {
@@ -102,7 +103,6 @@ export const useTurnActions = (
 
   const handleRollDice = async () => {
     if (!opponentId || isRollingDice || pendingDiceTotal !== null) return;
-    
     let roll = Math.floor(Math.random() * 6) + 1;
     let finalTotal = roll;
     if (activeItemEffect === 'i_dice_plus2') finalTotal = roll + 2; 
@@ -110,16 +110,11 @@ export const useTurnActions = (
       const roll2 = Math.floor(Math.random() * 6) + 1;
       finalTotal = roll + roll2;
     }
-
-    await updateDoc(doc(db, 'rooms', roomId), {
-      isRollingDice: true,
-      pendingDiceTotal: finalTotal
-    });
+    await updateDoc(doc(db, 'rooms', roomId), { isRollingDice: true, pendingDiceTotal: finalTotal });
   };
 
   const handleConfirmMove = async () => {
     if (pendingDiceTotal === null) return;
-    
     let itemMessage = '';
     if (activeItemEffect === 'i_dice_plus2') itemMessage = `🎲 ダイス+2カードの効果が適用されました！`;
     else if (activeItemEffect === 'i_dice_double') itemMessage = `🎲 サイコロ2個振りの効果が適用されました！`;
@@ -129,11 +124,7 @@ export const useTurnActions = (
     if (nextPosition >= STATIONS.length - 1) nextPosition = STATIONS.length - 1;
     
     await updateDoc(doc(db, 'rooms', roomId), { 
-      sharedPosition: nextPosition, 
-      lastDiceRoll: pendingDiceTotal, 
-      phase: 'roulette',
-      isRollingDice: false,
-      pendingDiceTotal: null
+      sharedPosition: nextPosition, lastDiceRoll: pendingDiceTotal, phase: 'roulette', isRollingDice: false, pendingDiceTotal: null
     });
     setActiveItemEffect(null);
   };
@@ -143,9 +134,15 @@ export const useTurnActions = (
       if (activeItemEffect) await showAlert('⚠️ すでに別のアイテム効果を準備中です！');
       return;
     }
+
+    if (roomData?.squareType === 'green' && ['i_mission_swap', 'i_mission_share', 'i_mission_reroll'].includes(itemId)) {
+      await showAlert('⚠️ 協力ミッション中は、ミッションを変えるアイテムは使えません！');
+      return;
+    }
+
     const itemFunc = ITEM_REGISTRY[itemId];
     if (!itemFunc) { await showAlert('⚠️ このアイテムは現在調整中です！'); return; }
-
+    
     const confirmUse = await showConfirm(`アイテム「${ITEMS.find(i => i.id === itemId)?.name}」を使いますか？`);
     if (!confirmUse) return;
 
@@ -155,11 +152,9 @@ export const useTurnActions = (
 
     const newItems = [...(me?.items || [])];
     newItems.splice(index, 1);
-    
     const updates: any = { [`players.${userId}.items`]: newItems, ...result.updates };
     if (result.activeEffect) setActiveItemEffect(result.activeEffect);
     if (result.message) await showAlert(result.message);
-
     await updateDoc(doc(db, 'rooms', roomId), updates);
   };
 
@@ -171,7 +166,6 @@ export const useTurnActions = (
 
   const handleSpinRoulette = async () => {
     if (!opponentId || isSpinningRoulette || pendingRouletteData !== null) return;
-    
     const timeResult = STAY_TIMES[Math.floor(Math.random() * STAY_TIMES.length)];
     const squareTypes = ['blue', 'red', 'green', 'yellow'] as const;
     let chosenType: typeof squareTypes[number] = squareTypes[Math.floor(Math.random() * squareTypes.length)];
@@ -188,40 +182,55 @@ export const useTurnActions = (
       const otherMissions = targetMissions.filter(m => m.id !== myMissionObj.id);
       opponentMissionObj = otherMissions.length > 0 ? otherMissions[Math.floor(Math.random() * otherMissions.length)] : myMissionObj;
     }
-
     await updateDoc(doc(db, 'rooms', roomId), {
-      isSpinningRoulette: true,
-      pendingRouletteData: {
-        time: timeResult, squareType: chosenType,
-        myMissionId: myMissionObj.id, opMissionId: opponentMissionObj.id
-      }
+      isSpinningRoulette: true, pendingRouletteData: { time: timeResult, squareType: chosenType, myMissionId: myMissionObj.id, opMissionId: opponentMissionObj.id }
     });
   };
 
   const handleConfirmRoulette = async () => {
     if (!pendingRouletteData || !opponentId) return;
-
     await updateDoc(doc(db, 'rooms', roomId), {
       stayTime: pendingRouletteData.time, 
       squareType: pendingRouletteData.squareType, 
       currentMissions: { [userId]: pendingRouletteData.myMissionId, [opponentId]: pendingRouletteData.opMissionId }, 
-      phase: 'mission',
-      missionTimer: { isRunning: false, remainingSeconds: pendingRouletteData.time * 60, endTime: null },
+      phase: 'destination', 
+      destinations: {}, 
       isSpinningRoulette: false,
       pendingRouletteData: null
     });
   };
 
-  const handleEndMission = async (mySuccess: boolean, opponentSuccess: boolean, myMission?: Mission | null, opponentMission?: Mission | null) => {
-    if (!opponentId || !myMission || !opponentMission) return;
+  const handleSubmitDestination = async () => {
+    if (isMyTurn) {
+      if (!dest1) { await showAlert('⚠️ 1番目の目的地を入力してください！'); return; }
+      await updateDoc(doc(db, 'rooms', roomId), {
+        'destinations.dest1': dest1,
+        'destinations.dest3': dest3 || ''
+      });
+    } else {
+      if (!dest2) { await showAlert('⚠️ 2番目の目的地を入力してください！'); return; }
+      await updateDoc(doc(db, 'rooms', roomId), {
+        'destinations.dest2': dest2
+      });
+    }
+  };
 
+  const handleConfirmDestinations = async () => {
+    const time = roomData.stayTime || 30;
+    await updateDoc(doc(db, 'rooms', roomId), {
+      phase: 'mission',
+      missionTimer: { isRunning: true, remainingSeconds: time * 60, endTime: Date.now() + time * 60 * 1000 }
+    });
+    setDest1(''); setDest2(''); setDest3('');
+  };
+
+  const handleEndMission = async (
+    mySuccess: boolean, opponentSuccess: boolean, myMission?: Mission | null, opponentMission?: Mission | null, reachedFirstDest: boolean = true 
+  ) => {
+    if (!opponentId || !myMission || !opponentMission) return;
     let actualMySuccess = mySuccess;
     let passMsg = '';
-    if (!mySuccess && activeItemEffect === 'i_mission_pass') {
-      actualMySuccess = true;
-      passMsg = `\n🎟️ ミッションフリーパスの効果で、無条件クリア扱いになりました！`;
-    }
-
+    if (!mySuccess && activeItemEffect === 'i_mission_pass') { actualMySuccess = true; passMsg = `\n🎟️ ミッションフリーパスの効果で、無条件クリア扱いになりました！`; }
     if (actualMySuccess && opponentSuccess) triggerConfetti();
 
     let myMoneyChange = 0; let opponentMoneyChange = 0;
@@ -272,18 +281,28 @@ export const useTurnActions = (
       }
     }
 
+    let destPenaltyMsg = '';
+    const currentTurn = roomData?.currentTurn;
+    if (!reachedFirstDest) {
+      const PENALTY_AMOUNT = 1000;
+      if (currentTurn === userId) {
+        myMoneyChange -= PENALTY_AMOUNT;
+        destPenaltyMsg = `\n⏰ 【到着失敗】代表者(あなた)にペナルティ -${PENALTY_AMOUNT}円！`;
+      } else if (currentTurn === opponentId) {
+        opponentMoneyChange -= PENALTY_AMOUNT;
+        destPenaltyMsg = `\n⏰ 【到着失敗】代表者(あいて)にペナルティ -${PENALTY_AMOUNT}円！`;
+      }
+    }
+
     const myResult = processDebtAndSales(me?.money || 0, me?.properties || [], myMoneyChange);
     const opResult = processDebtAndSales(opponent?.money || 0, opponent?.properties || [], opponentMoneyChange);
 
-    if (!actualMySuccess && opponentSuccess) {
-      newBombyId = userId; 
-    } else if (actualMySuccess && !opponentSuccess) {
-      newBombyId = opponentId; 
-    } else if (!actualMySuccess && !opponentSuccess) {
-      newBombyId = Math.random() < 0.5 ? userId : opponentId; 
-    }
+    if (!actualMySuccess && opponentSuccess) newBombyId = userId; 
+    else if (actualMySuccess && !opponentSuccess) newBombyId = opponentId; 
+    else if (!actualMySuccess && !opponentSuccess) newBombyId = Math.random() < 0.5 ? userId : opponentId; 
 
     let alertMsg = `【ミッション結果】\nあなた: ${myMoneyChange >= 0 ? '+' : ''}${myMoneyChange}円${myItemMsg}\nあいて: ${opponentMoneyChange >= 0 ? '+' : ''}${opponentMoneyChange}円${opponentItemMsg}\n`;
+    alertMsg += destPenaltyMsg; 
     if (myResult.soldNames.length > 0) alertMsg += `\n⚠️ 借金返済のため、あなたの物件が売却されました: ${myResult.soldNames.join(', ')}`;
     if (opResult.soldNames.length > 0) alertMsg += `\n⚠️ 借金返済のため、あいての物件が売却されました: ${opResult.soldNames.join(', ')}`;
     
@@ -293,37 +312,23 @@ export const useTurnActions = (
       nextBombyType = 'normal';
     }
 
-    // 🔑 spending（リアル出費入力）へ移動
     alertMsg += `\n続けて「リアル出費の入力」に移動します！`;
-    
     await showAlert(alertMsg);
     setActiveItemEffect(null); 
 
     await updateDoc(doc(db, 'rooms', roomId), {
-      [`players.${userId}.money`]: myResult.newMoney, 
-      [`players.${userId}.properties`]: myResult.remainingProperties, 
-      [`players.${userId}.items`]: myNewItems,
-      [`players.${opponentId}.money`]: opResult.newMoney, 
-      [`players.${opponentId}.properties`]: opResult.remainingProperties, 
-      [`players.${opponentId}.items`]: opponentNewItems,
-      bombyPossessedId: newBombyId, 
-      bombyType: nextBombyType, 
-      phase: 'spending', 
-      spendings: {} 
+      [`players.${userId}.money`]: myResult.newMoney, [`players.${userId}.properties`]: myResult.remainingProperties, [`players.${userId}.items`]: myNewItems,
+      [`players.${opponentId}.money`]: opResult.newMoney, [`players.${opponentId}.properties`]: opResult.remainingProperties, [`players.${opponentId}.items`]: opponentNewItems,
+      bombyPossessedId: newBombyId, bombyType: nextBombyType, phase: 'spending', spendings: {} 
     });
   };
 
-  // 🔑 自分の出費を確定する
   const handleSubmitSpending = async () => {
-    if (spentInput === '') {
-      await showAlert('⚠️ 使ってない場合は「0」を入力してください！');
-      return;
-    }
+    if (spentInput === '') { await showAlert('⚠️ 使ってない場合は「0」を入力してください！'); return; }
     const amount = Number(spentInput);
     await updateDoc(doc(db, 'rooms', roomId), { [`spendings.${userId}`]: amount });
   };
 
-  // 🔑 2人の出費が揃ったら精算して物件入札へ
   const handleFinishSpending = async () => {
     if (!opponentId) return;
     const mySpent = roomData?.spendings?.[userId] || 0;
@@ -340,12 +345,9 @@ export const useTurnActions = (
     await showAlert(msg);
 
     await updateDoc(doc(db, 'rooms', roomId), {
-      [`players.${userId}.money`]: myResult.newMoney,
-      [`players.${userId}.properties`]: myResult.remainingProperties,
-      [`players.${opponentId}.money`]: opResult.newMoney,
-      [`players.${opponentId}.properties`]: opResult.remainingProperties,
-      phase: 'bidding',
-      bids: {}
+      [`players.${userId}.money`]: myResult.newMoney, [`players.${userId}.properties`]: myResult.remainingProperties,
+      [`players.${opponentId}.money`]: opResult.newMoney, [`players.${opponentId}.properties`]: opResult.remainingProperties,
+      phase: 'bidding', bids: {}
     });
     setSpentInput('');
   };
@@ -358,7 +360,10 @@ export const useTurnActions = (
         if (selectedProp.type === 'limit' && bidAmount > selectedProp.price) {
           await showAlert(`⚠️ リアル入札額（${bidAmount}円）が物件の上限を超えています！\nルールに基づき、ゲーム内の入札額は「${selectedProp.price}円」として確定します。`);
           finalAmount = selectedProp.price;
-        } else if (selectedProp.type === 'fixed') { finalAmount = selectedProp.price; }
+        } else if (selectedProp.type === 'fixed') { 
+          finalAmount = selectedProp.price; 
+        }
+        
         if (finalAmount > (me?.money || 0)) {
           await showAlert(`⚠️ 所持金（${me?.money}円）を超えて物件を買うことはできません！\n今回は「買えない」扱いとなります。`);
           finalAmount = 0; finalPropertyId = ''; 
@@ -389,12 +394,24 @@ export const useTurnActions = (
 
     const myProperties: Property[] = [...(me.properties || [])];
     const opponentProperties: Property[] = [...(opponent?.properties || [])];
-    let myNewMoney = me.money || 0; let opponentNewMoney = opponent?.money || 0;
+    let myNewMoney = me.money || 0; 
+    let opponentNewMoney = opponent?.money || 0;
     
-    if (myWonProperty) { myProperties.push(myWonProperty); myNewMoney -= myBid.amount; }
-    if (opponentWonProperty) { opponentProperties.push(opponentWonProperty); opponentNewMoney -= opponentBid.amount; }
+    let myPaidCost = 0;
+    let opPaidCost = 0;
 
-    let alertMessage = `【入札結果】\nあなた: ${myWonProperty ? myWonProperty.name + ' を獲得！' : '獲得なし'}\nあいて: ${opponentWonProperty ? opponentWonProperty.name + ' を獲得！' : '獲得なし'}`;
+    if (myWonProperty) { 
+      myProperties.push(myWonProperty); 
+      myPaidCost = myWonProperty.type === 'fixed' ? myWonProperty.price : myBid.amount;
+      myNewMoney -= myPaidCost; 
+    }
+    if (opponentWonProperty) { 
+      opponentProperties.push(opponentWonProperty); 
+      opPaidCost = opponentWonProperty.type === 'fixed' ? opponentWonProperty.price : opponentBid.amount;
+      opponentNewMoney -= opPaidCost; 
+    }
+
+    let alertMessage = `【入札結果】\nあなた: ${myWonProperty ? myWonProperty.name + ` を獲得！(-${myPaidCost}円)` : '獲得なし'}\nあいて: ${opponentWonProperty ? opponentWonProperty.name + ` を獲得！(-${opPaidCost}円)` : '獲得なし'}`;
 
     const currentSeasonIndex = SEASONS.indexOf(currentSeason);
     let nextSeasonIndex = currentSeasonIndex + 1; let nextYear = currentYear;
@@ -413,9 +430,9 @@ export const useTurnActions = (
     if (myDebtMsg || opDebtMsg) alertMessage += `\n\n💸💸💸 借金利息発生 💸💸💸${myDebtMsg}${opDebtMsg}`;
 
     await showAlert(alertMessage);
-
     const isGoal = sharedPosition === STATIONS.length - 1;
-    const nextPhase = isGoal ? 'result' : (roomData.bombyPossessedId === opponentId ? 'bomby' : 'dice');
+
+    const nextPhase = isGoal ? 'result' : (roomData.bombyPossessedId ? 'bomby' : 'dice');
 
     await updateDoc(doc(db, 'rooms', roomId), {
       [`players.${userId}.properties`]: myProperties, [`players.${opponentId}.properties`]: opponentProperties,
@@ -426,77 +443,78 @@ export const useTurnActions = (
 
   const handleBombyAction = async () => {
     if (!opponentId) return;
+    if (roomData?.bombyPossessedId !== userId) return; 
     
+    // 💡 テストする時はここの数字を書き換えてください
     const rand = Math.floor(Math.random() * 100);
     let newType = 'normal';
-    if (rand < 5) newType = 'king';          
-    else if (rand < 25) newType = 'petit';   
+    if (rand < 5) newType = 'king'; else if (rand < 25) newType = 'petit';   
 
-    let moneyChange = 0; 
-    let message = ''; 
-    let remainingProps = [...(me?.properties || [])];
+    const currentType = roomData?.bombyType || 'normal';
+
+    if (newType !== currentType) {
+      if (newType === 'king') {
+        await showAlert("⚡️⚡️⚡️⚡️⚡️⚡️⚡️\n\n「グエッヘッヘ！\nオレ様はキングボンビーだ！\nこれからお前に地獄を見せてやるのねん！」\n\n⚡️⚡️⚡️⚡️⚡️⚡️⚡️");
+      } else if (newType === 'petit') {
+        await showAlert("✨✨✨✨✨✨✨\n\n「ボク、プチボンビーなのねん！\nよろしくなのねん！」\n\n✨✨✨✨✨✨✨");
+      } else if (newType === 'normal') {
+        await showAlert("💨💨💨\n\n「普通の貧乏神に戻ったのねん…」\n\n💨💨💨");
+      }
+    }
+
+    let moneyChange = 0; let message = ''; let remainingProps = [...(me?.properties || [])];
 
     if (newType === 'king') {
-      const roll = Math.floor(Math.random() * 6) + 1; 
-      moneyChange = roll * -1000;
-      message = `【👑 キングボンビー降臨！】\n「グエッヘッヘ！サイコロの目は『${roll}』だ！」\n所持金から ${Math.abs(moneyChange)}円 奪われた...`;
-      
+      const roll = Math.floor(Math.random() * 6) + 1; moneyChange = roll * -1000;
+      message = `【👑 キングボンビーの悪行】\n「グエッヘッヘ！サイコロの目は『${roll}』だ！」\n所持金から ${Math.abs(moneyChange)}円 奪われた...`;
       if (remainingProps.length > 0) {
-        remainingProps.sort((a, b) => b.price - a.price); 
-        const lostProp = remainingProps.shift()!; 
+        remainingProps.sort((a, b) => b.price - a.price); const lostProp = remainingProps.shift()!; 
         message += `\n\nさらに一番高い物件「${lostProp.name}」を捨てられたのねん！`;
       }
       message += `\n\nさらに現実で「ロック画面を相手が撮った変顔」に変更してください！`;
-
     } else if (newType === 'petit') {
-      if (Math.random() < 0.5) { 
-        moneyChange = -100; 
-        message = `【👼 プチボンビー】\n「お小遣いちょうだいのねん！」\n所持金が -100円 されました。`; 
-      } else { 
-        message = `【👼 プチボンビー】\n「今回は何もしないでおいてあげるのねん！」\n（ノーダメージ）`; 
-      }
+      if (Math.random() < 0.5) { moneyChange = -100; message = `【👼 プチボンビーの悪行】\n「お小遣いちょうだいのねん！」\n所持金が -100円 されました。`; } 
+      else { message = `【👼 プチボンビーの悪行】\n「今回は何もしないでおいてあげるのねん！」\n（ノーダメージ）`; }
     } else { 
       const act = Math.random();
       if (act < 0.33) { 
         moneyChange = -1000; 
-        message = `【😈 貧乏神】\n「お金を落としてきたのねん！」\n所持金が -1000円 されました。`; 
+        message = `【😈 貧乏神の悪行】\n「お金を落としてきたのねん！」\n所持金が -1000円 されました。`; 
       } else if (act < 0.66) { 
-        const input = window.prompt('相手に奢ったジュースやお菓子の金額（円）を半角数字で入力してください。', '150');
+        // 🔑 修正：ジュース奢りの時は先にセリフを出して、その後に入力させる
+        await showAlert(`【😈 貧乏神の悪行】\n「のどが渇いたのねん！」\n現実で相手に「ジュースかお菓子」を奢ってください！`);
+        
+        const input = window.prompt('相手に奢る（または奢った）ジュースやお菓子の金額（円）を半角数字で入力してください。', '150');
         const cost = parseInt(input || '0', 10);
         const finalCost = (!isNaN(cost) && cost > 0) ? cost : 150;
         moneyChange = -finalCost; 
-        message = `【😈 貧乏神】\n「のどが渇いたのねん！」\n現実で相手に「ジュースかお菓子」を奢ってください！\n（ゲーム内の所持金もジュース代 -${finalCost}円 されたのねん！）`; 
+        message = `【😈 貧乏神の悪行 (結果)】\nゲーム内の所持金からジュース代 -${finalCost}円 されたのねん！`; 
       } else { 
-        message = `【😈 貧乏神】\n「歩くの疲れたのねん！」\n次の駅まで相手の「カバン持ち」をしてください！`; 
+        message = `【😈 貧乏神の悪行】\n「歩くの疲れたのねん！」\n次の駅まで相手の「カバン持ち」をしてください！`; 
       }
     }
-
     const myResult = processDebtAndSales(me?.money || 0, remainingProps, moneyChange);
-    if (myResult.soldNames.length > 0) {
-      message += `\n\n⚠️ 借金返済のため、物件が強制売却されました: ${myResult.soldNames.join(', ')}`;
-    }
-
+    if (myResult.soldNames.length > 0) message += `\n\n⚠️ 借金返済のため、物件が強制売却されました: ${myResult.soldNames.join(', ')}`;
+    
     await showAlert(message);
 
     await updateDoc(doc(db, 'rooms', roomId), {
-      [`players.${userId}.money`]: myResult.newMoney, 
-      [`players.${userId}.properties`]: myResult.remainingProperties,
-      bombyType: newType, 
-      phase: 'dice'
+      [`players.${userId}.money`]: myResult.newMoney, [`players.${userId}.properties`]: myResult.remainingProperties,
+      bombyType: newType, phase: 'dice'
     });
   };
 
   return {
-    diceResult: displayDice, 
-    rouletteResult: displayRoulette, 
+    diceResult: displayDice, rouletteResult: displayRoulette, 
     selectedPropertyId, setSelectedPropertyId, bidAmount, setBidAmount, activeItemEffect, setActiveItemEffect,
-    isRollingDice, isSpinningRoulette,
-    isAnimatingDice, isAnimatingRoulette,
+    isRollingDice, isSpinningRoulette, isAnimatingDice, isAnimatingRoulette,
     pendingDiceTotal, pendingRouletteData,
-    spentInput, setSpentInput, // 🔑 追加
+    spentInput, setSpentInput,
+    dest1, setDest1, dest2, setDest2, dest3, setDest3, 
     handleRollDice, handleConfirmMove, handleUseItem, handleDiscardItem, 
-    handleSpinRoulette, handleConfirmRoulette, handleEndMission, 
-    handleSubmitSpending, handleFinishSpending, // 🔑 追加
+    handleSpinRoulette, handleConfirmRoulette, 
+    handleSubmitDestination, handleConfirmDestinations, 
+    handleEndMission, handleSubmitSpending, handleFinishSpending, 
     handleSubmitBid, handleRevealBids, handleBombyAction,
   };
 };

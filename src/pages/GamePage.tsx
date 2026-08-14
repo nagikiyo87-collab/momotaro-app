@@ -3,10 +3,11 @@ import { useGameSync } from '../hooks/useGameSync';
 import { useTurnActions } from '../hooks/useTurnActions';
 import { STATIONS, STATION_PROPERTIES, MISSIONS, ITEMS } from '../data/gameData'; 
 import { RuleModal } from '../components/RuleModal';
-import { GameHeader, PlayerCards, GameMapView, BottomNav, AnimatedDice, AnimatedRoulette, SeasonalBackground, MissionPhaseUI, SpendingPhaseUI, BiddingPhaseUI, ResultPhaseUI } from '../components/GameUI';
+import { GameHeader, PlayerCards, GameMapView, BottomNav, AnimatedDice, AnimatedRoulette, SeasonalBackground, DestinationPhaseUI, MissionPhaseUI, SpendingPhaseUI, BiddingPhaseUI, ResultPhaseUI } from '../components/GameUI';
 import { motion, AnimatePresence } from 'framer-motion';
+import { doc, updateDoc } from 'firebase/firestore';
+import { db } from '../firebase';
 import '../styles/index.css'; 
-
 
 type Props = { roomId: string; userId: string; };
 
@@ -29,9 +30,16 @@ export const GamePage: React.FC<Props> = ({ roomId, userId }) => {
   const actions = useTurnActions(roomId, userId, roomData, me, opponent, opponentId, currentProperties);
   const phase = roomData?.phase || 'dice';
 
+  const handleAdjustMoney = async (amount: number) => {
+    const currentMoney = me?.money || 0;
+    await updateDoc(doc(db, 'rooms', roomId), {
+      [`players.${userId}.money`]: currentMoney + amount
+    });
+  };
+
   useEffect(() => {
     if (phase !== 'bidding') { actions.setSelectedPropertyId(''); actions.setBidAmount(0); }
-    if (phase !== 'spending') { actions.setSpentInput(''); } // 🔑 追加
+    if (phase !== 'spending') { actions.setSpentInput(''); } 
     if (phase === 'dice') { actions.setActiveItemEffect(null); }
   }, [phase]);
 
@@ -50,14 +58,19 @@ export const GamePage: React.FC<Props> = ({ roomId, userId }) => {
   const myMission = MISSIONS.find(m => m.id === currentMissions[userId]);
   const opponentMission = opponentId ? MISSIONS.find(m => m.id === currentMissions[opponentId]) : undefined;
 
-  // アイテムのフェーズごとの出し分け設定
   const MISSION_ITEMS = ['i_mission_swap', 'i_mission_share', 'i_mission_reroll', 'i_reward_double', 'i_mission_pass', 'i_time_extend'];
   const BOMBY_ITEMS = ['i_bomby_pass'];
 
   const dicePhaseItems = myItems.filter(id => !MISSION_ITEMS.includes(id) && !BOMBY_ITEMS.includes(id));
   const bombyPhaseItems = roomData?.bombyPossessedId === userId ? myItems.filter(id => BOMBY_ITEMS.includes(id)) : [];
   const availableDiceItems = [...dicePhaseItems, ...bombyPhaseItems];
-  const availableMissionItems = myItems.filter(id => MISSION_ITEMS.includes(id));
+
+  const BANNED_ON_GREEN = ['i_mission_swap', 'i_mission_share', 'i_mission_reroll'];
+  const availableMissionItems = myItems.filter(id => {
+    if (!MISSION_ITEMS.includes(id)) return false;
+    if (roomData?.squareType === 'green' && BANNED_ON_GREEN.includes(id)) return false;
+    return true;
+  });
 
   if (myItems.length > 3) {
     return (
@@ -125,7 +138,6 @@ export const GamePage: React.FC<Props> = ({ roomId, userId }) => {
                         </div>
                       )}
 
-                      {/* 🔑 3Dサイコロアニメーション部品を配置 */}
                       <div style={{ marginBottom: '20px' }}>
                         <AnimatedDice 
                           isRolling={actions.isAnimatingDice} 
@@ -133,7 +145,6 @@ export const GamePage: React.FC<Props> = ({ roomId, userId }) => {
                         />
                       </div>
 
-                      {/* 🔑 出目が決まったら「次へ進むボタン」に切り替わる！ */}
                       {actions.pendingDiceTotal !== null ? (
                         <button className="btn-pop btn-green" onClick={actions.handleConfirmMove} disabled={!isMyTurn}>
                           👉 この出目（{actions.pendingDiceTotal}マス）で進む！
@@ -152,17 +163,16 @@ export const GamePage: React.FC<Props> = ({ roomId, userId }) => {
                         {isMyTurn ? '⏱️ 滞在時間 ＆ マス決定！' : '⏳ 相手がルーレットを回しています...'}
                       </h3>
                       
-                      {/* 🔑 スロット風ルーレットアニメーション部品を配置 */}
                       <div style={{ marginBottom: '20px' }}>
                         <AnimatedRoulette 
                           isSpinning={actions.isAnimatingRoulette} 
                           result={actions.rouletteResult} 
                         />
                       </div>
-                      {/* 🔑 ルーレットの結果が決まったら「ミッションへ進むボタン」に切り替わる！ */}
+                      
                       {actions.pendingRouletteData !== null ? (
                         <button className="btn-pop" onClick={actions.handleConfirmRoulette} disabled={!isMyTurn}>
-                          🚀 ミッションへ進む！
+                          🚀 目的地決定へ進む！
                         </button>
                       ) : (
                         <button className="btn-pop btn-green" onClick={actions.handleSpinRoulette} disabled={!isMyTurn || actions.rouletteResult !== null || actions.isSpinningRoulette}>
@@ -172,9 +182,20 @@ export const GamePage: React.FC<Props> = ({ roomId, userId }) => {
                     </>
                   )}
 
+                  {phase === 'destination' && (
+                    <DestinationPhaseUI
+                      isMyTurn={isMyTurn}
+                      dest1={actions.dest1} setDest1={actions.setDest1}
+                      dest2={actions.dest2} setDest2={actions.setDest2}
+                      dest3={actions.dest3} setDest3={actions.setDest3}
+                      savedDestinations={roomData?.destinations}
+                      onSubmit={actions.handleSubmitDestination}
+                      onStart={actions.handleConfirmDestinations}
+                    />
+                  )}
+
                   {phase === 'mission' && (
                     <>
-                      {/* 🔑 消えていた「ミッション用アイテムを使う」ボタンのコードを復活させました！ */}
                       {isMyTurn && availableMissionItems.length > 0 && (
                         <div style={{ background: '#fffde7', padding: '15px', borderRadius: '12px', marginBottom: '20px', border: '4px solid #fbc02d', textAlign: 'left' }}>
                           <p style={{ margin: '0 0 12px 0', fontWeight: '800', fontSize: '1rem', color: '#f57f17' }}>🎒 ミッション用アイテムを使う</p>
@@ -191,21 +212,22 @@ export const GamePage: React.FC<Props> = ({ roomId, userId }) => {
                         </div>
                       )}
                       
-                      {/* 🔑 同期型タイマー対応のミッションUI */}
                       <MissionPhaseUI 
                         roomId={roomId} 
                         timerData={roomData?.missionTimer}
                         currentStationName={currentStationName} 
                         stayTime={roomData?.stayTime || 0} 
                         squareType={roomData?.squareType} 
+                        destinations={roomData?.destinations} 
                         myMission={myMission} 
                         opponentMission={opponentMission} 
                         opponentName={opponent?.name || '相手'} 
                         isMyTurn={isMyTurn} 
-                        onEndMission={(mySuccess, opSuccess) => actions.handleEndMission(mySuccess, opSuccess, myMission, opponentMission)} 
+                        onEndMission={(mySuccess, opSuccess, reachedFirst) => actions.handleEndMission(mySuccess, opSuccess, myMission, opponentMission, reachedFirst)} 
                       />
                     </>
                   )}
+
                   {phase === 'spending' && (
                     <SpendingPhaseUI 
                       spentInput={actions.spentInput} 
@@ -218,14 +240,22 @@ export const GamePage: React.FC<Props> = ({ roomId, userId }) => {
                       onFinishSpending={actions.handleFinishSpending}
                     />
                   )}
+
                   {phase === 'bidding' && (
                     <BiddingPhaseUI stayTime={roomData?.stayTime || 0} currentProperties={currentProperties} selectedPropertyId={actions.selectedPropertyId} setSelectedPropertyId={actions.setSelectedPropertyId} bidAmount={actions.bidAmount} setBidAmount={actions.setBidAmount} myBid={roomData?.bids?.[userId]} opponentBid={roomData?.bids?.[opponentId!]} bothSubmitted={!!(roomData?.bids?.[userId] && roomData?.bids?.[opponentId!])} isMyTurn={isMyTurn} onSubmitBid={actions.handleSubmitBid} onRevealBids={() => actions.handleRevealBids(roomData.bids[userId], roomData.bids[opponentId!])} myMoney={me?.money || 0} />
                   )}
 
+                  {/* 🔑 修正: 憑いている人がボタンを押せるように修正し、テストボタンを削除 */}
                   {phase === 'bomby' && (
                     <div>
-                      <h3 style={{ margin: '0 0 15px 0', color: '#8e44ad', fontWeight: '800' }}>⚠️ 貧乏神の悪行！</h3>
-                      {isMyTurn ? <button className="btn-pop btn-purple" onClick={() => actions.handleBombyAction()}>判定を受ける</button> : <p>相手が貧乏神の悪行を受けています...</p>}
+                      <h3 style={{ margin: '0 0 15px 0', color: '#8e44ad', fontWeight: '800' }}>⚠️ 貧乏神のターン！</h3>
+                      {roomData?.bombyPossessedId === userId ? (
+                        <button className="btn-pop btn-purple" onClick={() => actions.handleBombyAction()} style={{ width: '100%' }}>
+                          🎲 悪行を受ける...
+                        </button>
+                      ) : (
+                        <p style={{ color: '#747d8c', fontWeight: '800', fontSize: '1.1rem' }}>⏳ 相手が貧乏神の悪行を受けています...</p>
+                      )}
                     </div>
                   )}
 
@@ -240,7 +270,7 @@ export const GamePage: React.FC<Props> = ({ roomId, userId }) => {
         </>
       )}
 
-      <RuleModal isOpen={isRuleOpen} onClose={() => setIsRuleOpen(false)} />
+      <RuleModal isOpen={isRuleOpen} onClose={() => setIsRuleOpen(false)} onAdjustMoney={handleAdjustMoney} />
     </div>
   );
 };

@@ -42,23 +42,21 @@ export const GameHeader: React.FC<{
     </header>
   );
 };
+
 // --- ② プレイヤーカード UI ---
 export const PlayerCards: React.FC<{
   me: any; opponent: any; isMyTurn: boolean; userId: string; opponentId: string | undefined;
   bombyPossessedId: string | null; bombyType: string; inviteUrl: string;
 }> = ({ me, opponent, isMyTurn, userId, opponentId, bombyPossessedId, bombyType, inviteUrl }) => {
-  // 🔑 publicフォルダの画像を返す関数
   const getBombyImageUrl = (type: string) => {
     if (type === 'king') return '/bomby-king.png';
     if (type === 'petit') return '/bomby-petit.png';
     return '/bomby-normal.png';
   };
-  // アイコンは名前の横用に残す
   const getBombyIcon = (type: string) => type === 'king' ? '👑' : type === 'petit' ? '👼' : '😈';
 
   const [detailPlayer, setDetailPlayer] = useState<'me' | 'opponent' | null>(null);
 
-  // 🔑 消えてしまっていた詳細モーダルの処理を復活！
   const renderDetailModal = () => {
     if (!detailPlayer) return null;
     const player = detailPlayer === 'me' ? me : opponent;
@@ -120,13 +118,10 @@ export const PlayerCards: React.FC<{
       {renderDetailModal()}
 
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: '15px', marginBottom: '25px' }}>
-        
-        {/* --- あなたのカード --- */}
         <div 
           onClick={() => setDetailPlayer('me')} 
           style={{ flex: 1, position: 'relative', overflow: 'hidden', background: '#ffffff', padding: '20px 15px', borderRadius: '16px', textAlign: 'center', border: isMyTurn ? '4px solid #ff4757' : '4px solid #dcdde1', boxShadow: isMyTurn ? '0 8px 0 rgba(255,71,87,0.3)' : '0 6px 0 rgba(0,0,0,0.1)', transform: isMyTurn ? 'translateY(-4px)' : 'none', transition: 'all 0.2s', cursor: 'pointer' }}
         >
-          {/* 🔑 背景画像としてボンビーを表示（半透明） */}
           {bombyPossessedId === userId && (
             <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, opacity: 0.3, backgroundImage: `url(${getBombyImageUrl(bombyType)})`, backgroundSize: 'cover', backgroundPosition: 'center', backgroundRepeat: 'no-repeat', pointerEvents: 'none', zIndex: 0 }} />
           )}
@@ -143,12 +138,10 @@ export const PlayerCards: React.FC<{
           </div>
         </div>
 
-        {/* --- 相手のカード --- */}
         <div 
           onClick={() => { if (opponent) setDetailPlayer('opponent') }} 
           style={{ flex: 1, position: 'relative', overflow: 'hidden', background: '#ffffff', padding: '20px 15px', borderRadius: '16px', textAlign: 'center', border: !isMyTurn && opponent ? '4px solid #ff4757' : '4px solid #dcdde1', opacity: opponent ? 1 : 0.6, boxShadow: !isMyTurn && opponent ? '0 8px 0 rgba(255,71,87,0.3)' : '0 6px 0 rgba(0,0,0,0.1)', transform: !isMyTurn && opponent ? 'translateY(-4px)' : 'none', transition: 'all 0.2s', cursor: opponent ? 'pointer' : 'default' }}
         >
-          {/* 🔑 背景画像としてボンビーを表示（半透明） */}
           {bombyPossessedId === opponentId && opponent && (
             <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, opacity: 0.3, backgroundImage: `url(${getBombyImageUrl(bombyType)})`, backgroundSize: 'cover', backgroundPosition: 'center', backgroundRepeat: 'no-repeat', pointerEvents: 'none', zIndex: 0 }} />
           )}
@@ -175,7 +168,7 @@ export const PlayerCards: React.FC<{
   );
 };
 
-// --- 以下（③マップ以降）は変更なしでそのまま ---
+// --- ③ マップ UI ---
 export const GameMapView: React.FC<{ currentStationName: string; sharedPosition: number }> = ({ currentStationName, sharedPosition }) => (
   <motion.div initial={{ x: 20, opacity: 0 }} animate={{ x: 0, opacity: 1 }} exit={{ x: 20, opacity: 0 }} transition={{ duration: 0.2 }} style={{ padding: '20px', background: '#e1efc3', borderRadius: '16px', minHeight: '70vh', border: '4px solid #badc58', position: 'relative', overflow: 'hidden' }}>
     <div style={{ textAlign: 'center', marginBottom: '40px', position: 'relative', zIndex: 10 }}>
@@ -302,12 +295,91 @@ const MissionTimer: React.FC<{ roomId: string; stayTime: number; timerData: any 
   );
 };
 
+export const DestinationPhaseUI: React.FC<{
+  isMyTurn: boolean;
+  dest1: string; setDest1: (val: string) => void;
+  dest2: string; setDest2: (val: string) => void;
+  dest3: string; setDest3: (val: string) => void;
+  savedDestinations: any; // 🔑 追加
+  onSubmit: () => void;   // 🔑 追加
+  onStart: () => void;    // 🔑 追加
+}> = ({ isMyTurn, dest1, setDest1, dest2, setDest2, dest3, setDest3, savedDestinations, onSubmit, onStart }) => {
+  
+  // DBのデータを見て、自分と相手が送信済みか判定する
+  const mySubmitted = isMyTurn ? !!savedDestinations?.dest1 : !!savedDestinations?.dest2;
+  const bothSubmitted = !!savedDestinations?.dest1 && !!savedDestinations?.dest2;
+
+  return (
+    <>
+      <h3 style={{ margin: '0 0 15px 0', color: '#8e44ad', fontWeight: '800', fontSize: '1.3rem' }}>🗺️ 目的地を決めよう！</h3>
+      <div style={{ padding: '20px', background: '#f5eef8', borderRadius: '16px', marginBottom: '15px', border: '4px solid #d2b4de', textAlign: 'left' }}>
+        
+        {!mySubmitted ? (
+          isMyTurn ? (
+            // --- 代表者の入力フォーム ---
+            <>
+              <p style={{ margin: '0 0 15px 0', fontWeight: 'bold', color: '#2c3e50', fontSize: '0.95rem' }}>代表者のあなたが、1番目と3番目の目的地を入力してください。</p>
+              <div style={{ marginBottom: '15px' }}>
+                <label style={{ fontWeight: 'bold', color: '#e74c3c', fontSize: '0.9rem' }}>📍 1番目の目的地</label>
+                <input type="text" value={dest1} onChange={e => setDest1(e.target.value)} placeholder="例: 東口のカフェ" style={{ width: '100%', padding: '12px', borderRadius: '8px', border: '2px solid #bdc3c7', marginTop: '5px' }} />
+              </div>
+              <div style={{ marginBottom: '20px' }}>
+                <label style={{ fontWeight: 'bold', color: '#2ecc71', fontSize: '0.9rem' }}>📍 3番目の目的地 (時間延長用/任意)</label>
+                <input type="text" value={dest3} onChange={e => setDest3(e.target.value)} placeholder="例: 公園など (任意)" style={{ width: '100%', padding: '12px', borderRadius: '8px', border: '2px solid #bdc3c7', marginTop: '5px' }} />
+              </div>
+              <button className="btn-pop btn-purple" onClick={onSubmit} style={{ width: '100%' }}>
+                自分の目的地を送信する
+              </button>
+            </>
+          ) : (
+            // --- 相手の入力フォーム ---
+            <>
+              <p style={{ margin: '0 0 15px 0', fontWeight: 'bold', color: '#2c3e50', fontSize: '0.95rem' }}>あなたが、2番目の目的地を入力してください。</p>
+              <div style={{ marginBottom: '15px' }}>
+                <label style={{ fontWeight: 'bold', color: '#3498db', fontSize: '0.9rem' }}>📍 2番目の目的地</label>
+                <input type="text" value={dest2} onChange={e => setDest2(e.target.value)} placeholder="例: コンビニ" style={{ width: '100%', padding: '12px', borderRadius: '8px', border: '2px solid #bdc3c7', marginTop: '5px' }} />
+              </div>
+              <button className="btn-pop btn-blue" onClick={onSubmit} style={{ width: '100%' }}>
+                自分の目的地を送信する
+              </button>
+            </>
+          )
+        ) : (
+          // --- 送信後の待機画面 ---
+          <div style={{ textAlign: 'center', padding: '10px 0' }}>
+            <div style={{ fontSize: '3.5rem', marginBottom: '10px' }}>✅</div>
+            <p style={{ fontWeight: '800', color: '#27ae60', fontSize: '1.2rem', margin: '0 0 10px 0' }}>あなたの入力完了！</p>
+            {!bothSubmitted && <p style={{ color: '#7f8c8d', fontSize: '1rem', fontWeight: 'bold', margin: 0 }}>相手の入力を待っています...</p>}
+          </div>
+        )}
+
+        {/* --- 双方が送信完了したら出発ボタンを出す --- */}
+        {bothSubmitted && isMyTurn && (
+          <div style={{ marginTop: '25px', borderTop: '3px dashed #d2b4de', paddingTop: '20px' }}>
+            <p style={{ fontWeight: '800', color: '#e74c3c', fontSize: '1.2rem', marginBottom: '15px', textAlign: 'center' }}>🎉 2人の目的地が揃いました！</p>
+            <button className="btn-pop" onClick={onStart}>確定して出発！(タイマースタート)</button>
+          </div>
+        )}
+        {bothSubmitted && !isMyTurn && (
+          <div style={{ marginTop: '25px', borderTop: '3px dashed #d2b4de', paddingTop: '20px', textAlign: 'center' }}>
+            <p style={{ fontWeight: '800', color: '#3498db', fontSize: '1.1rem', marginBottom: '10px' }}>2人の目的地が揃いました！</p>
+            <p style={{ color: '#7f8c8d', fontSize: '0.9rem', fontWeight: 'bold', margin: 0 }}>代表者の出発を待っています...</p>
+          </div>
+        )}
+
+      </div>
+    </>
+  );
+};
+
+// --- ミッション詳細 UI ---
 export const MissionPhaseUI: React.FC<{
   roomId: string; timerData: any;
   currentStationName: string; stayTime: number; squareType: string;
+  destinations: { dest1: string; dest2: string; dest3: string } | null;
   myMission: Mission | undefined; opponentMission: Mission | undefined; opponentName: string;
-  isMyTurn: boolean; onEndMission: (mySuccess: boolean, opSuccess: boolean) => void;
-}> = ({ roomId, timerData, currentStationName, stayTime, squareType, myMission, opponentMission, opponentName, isMyTurn, onEndMission }) => {
+  isMyTurn: boolean; onEndMission: (mySuccess: boolean, opSuccess: boolean, reachedFirstDest: boolean) => void;
+}> = ({ roomId, timerData, currentStationName, stayTime, squareType, destinations, myMission, opponentMission, opponentName, isMyTurn, onEndMission }) => {
   const getMissionColor = (type?: string) => {
     if (type === 'blue') return { bg: '#e3f2fd', border: '#64b5f6', text: '#1976d2', label: '🔵 青マス' };
     if (type === 'red') return { bg: '#ffebee', border: '#e57373', text: '#d32f2f', label: '🔴 赤マス' };
@@ -315,53 +387,156 @@ export const MissionPhaseUI: React.FC<{
     return { bg: '#e8f5e9', border: '#81c784', text: '#388e3c', label: '🟢 協力マス' }; 
   };
   const currentSquare = getMissionColor(squareType);
+  const [reachedFirstDest, setReachedFirstDest] = useState(true);
+
+  // 🔑 追加：報酬とペナルティをわかりやすくバッジで表示する関数
+  const renderRewardBadge = (mission: Mission, sqType: string) => {
+    const isPlus = mission.type === 'blue' || mission.type === 'green';
+    return (
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '10px' }}>
+        {isPlus && (
+          <span style={{ background: '#fff', padding: '4px 8px', borderRadius: '6px', border: '2px solid #2ecc71', color: '#27ae60', fontSize: '0.85rem', fontWeight: '900', boxShadow: '0 2px 0 rgba(46,204,113,0.2)' }}>
+            💰 成功: +{mission.reward}円
+          </span>
+        )}
+        {mission.type === 'red' && (
+          <span style={{ background: '#fff', padding: '4px 8px', borderRadius: '6px', border: '2px solid #e74c3c', color: '#c0392b', fontSize: '0.85rem', fontWeight: '900', boxShadow: '0 2px 0 rgba(231,76,60,0.2)' }}>
+            💀 失敗: {mission.penaltyType === 'half_money' ? '所持金半減' : `-${mission.penalty}円`}
+          </span>
+        )}
+        {sqType === 'yellow' && (
+          <span style={{ background: '#fff', padding: '4px 8px', borderRadius: '6px', border: '2px solid #f1c40f', color: '#d35400', fontSize: '0.85rem', fontWeight: '900', boxShadow: '0 2px 0 rgba(241,196,15,0.2)' }}>
+            🎁 成功: アイテム獲得
+          </span>
+        )}
+      </div>
+    );
+  };
 
   return (
     <>
-      <h3 style={{ margin: '0 0 15px 0', color: '#3498db', fontWeight: '800', fontSize: '1.3rem' }}>🏙️ ミッションタイム！</h3>
+      <h3 style={{ margin: '0 0 15px 0', color: '#3498db', fontWeight: '800', fontSize: '1.3rem' }}>🏙️ ミッション ＆ お買い物！</h3>
       <MissionTimer roomId={roomId} stayTime={stayTime} timerData={timerData} />
+      
       <div style={{ padding: '20px', background: '#e1f5fe', borderRadius: '16px', marginBottom: '15px', border: '4px solid #81d4fa' }}>
+        
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
           <span style={{ fontWeight: '800', color: '#2c3e50', fontSize: '1.2rem' }}>📍 {currentStationName}</span>
           <span style={{ fontWeight: '800', color: '#e74c3c', fontSize: '1.2rem', background: '#fff', padding: '6px 12px', borderRadius: '10px', border: '3px solid #ff7675' }}>⏱️ {stayTime}分</span>
         </div>
+
+        {destinations && (
+          <div style={{ background: '#fff', padding: '15px', borderRadius: '12px', border: '2px dashed #3498db', marginBottom: '20px', textAlign: 'left' }}>
+            <p style={{ margin: '0 0 10px 0', fontWeight: 'bold', color: '#2c3e50' }}>🚩 今ターンの目的地</p>
+            <div style={{ fontSize: '0.95rem', fontWeight: 'bold' }}>
+              <div style={{ color: '#e74c3c', marginBottom: '5px' }}>① {destinations.dest1}</div>
+              <div style={{ color: '#3498db', marginBottom: '5px' }}>② {destinations.dest2}</div>
+              {destinations.dest3 && <div style={{ color: '#2ecc71' }}>③ {destinations.dest3}</div>}
+            </div>
+          </div>
+        )}
+
         <div style={{ textAlign: 'center', marginBottom: '20px' }}>
           <span style={{ background: currentSquare.bg, border: `3px solid ${currentSquare.border}`, color: currentSquare.text, padding: '8px 16px', borderRadius: '20px', fontWeight: '800', fontSize: '1rem', boxShadow: '0 4px 0 rgba(0,0,0,0.05)' }}>
             {currentSquare.label} に到達！
           </span>
         </div>
+
         <div style={{ display: 'flex', flexDirection: 'column', gap: '15px', marginBottom: '25px' }}>
           {myMission && (
             <div style={{ background: currentSquare.bg, border: `3px solid ${currentSquare.border}`, padding: '15px', borderRadius: '12px', textAlign: 'left', boxShadow: '0 4px 0 rgba(0,0,0,0.05)' }}>
               <div style={{ fontSize: '0.9rem', fontWeight: '800', color: currentSquare.text, marginBottom: '6px' }}>👤 あなたのミッション</div>
               <div style={{ fontWeight: '800', fontSize: '1.1rem', marginBottom: '6px' }}>{myMission.name}</div>
-              <p style={{ margin: '0 0 6px 0', fontSize: '0.95rem', fontWeight: 'bold' }}>{myMission.description}</p>
+              <p style={{ margin: '0', fontSize: '0.95rem', fontWeight: 'bold' }}>{myMission.description}</p>
+              {/* 🔑 ここでバッジを表示 */}
+              {renderRewardBadge(myMission, squareType)}
             </div>
           )}
           {opponentMission && (
             <div style={{ background: currentSquare.bg, border: `3px solid ${currentSquare.border}`, padding: '15px', borderRadius: '12px', textAlign: 'left', opacity: 0.9, boxShadow: '0 4px 0 rgba(0,0,0,0.05)' }}>
               <div style={{ fontSize: '0.9rem', fontWeight: '800', color: currentSquare.text, marginBottom: '6px' }}>👤 {opponentName}のミッション</div>
               <div style={{ fontWeight: '800', fontSize: '1.1rem', marginBottom: '6px' }}>{opponentMission.name}</div>
-              <p style={{ margin: '0 0 6px 0', fontSize: '0.95rem', fontWeight: 'bold' }}>{opponentMission.description}</p>
+              <p style={{ margin: '0', fontSize: '0.95rem', fontWeight: 'bold' }}>{opponentMission.description}</p>
+              {/* 🔑 ここでバッジを表示 */}
+              {renderRewardBadge(opponentMission, squareType)}
             </div>
           )}
         </div>
+
         {isMyTurn ? (
-          <div style={{ background: '#fff', padding: '20px', borderRadius: '16px', border: '3px solid #ccc', boxShadow: '0 6px 0 rgba(0,0,0,0.1)' }}>
-            <p style={{ margin: '0 0 15px 0', fontWeight: '800', fontSize: '1.1rem', color: '#2c3e50' }}>📝 ミッション結果を入力</p>
+          <div style={{ background: '#fff', padding: '20px', borderRadius: '16px', border: '3px solid #ccc', boxShadow: '0 6px 0 rgba(0,0,0,0.1)', textAlign: 'left' }}>
+            <p style={{ margin: '0 0 15px 0', fontWeight: '800', fontSize: '1.1rem', color: '#2c3e50', textAlign: 'center' }}>📝 ミッション結果を入力</p>
+            
+            <div style={{ background: '#ffefeb', padding: '10px', borderRadius: '8px', border: '2px solid #ff7675', marginBottom: '20px' }}>
+              <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}>
+                <input type="checkbox" checked={reachedFirstDest} onChange={(e) => setReachedFirstDest(e.target.checked)} style={{ transform: 'scale(1.5)', marginRight: '15px', accentColor: '#e74c3c' }} />
+                <span style={{ fontWeight: 'bold', color: '#d63031', fontSize: '0.95rem' }}>1番目の目的地に間に合った<br/><span style={{ fontSize: '0.8rem', fontWeight: 'normal' }}>※外すと代表者に-1,000円のペナルティ</span></span>
+              </label>
+            </div>
+
             <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
-              <button className="btn-pop btn-green" onClick={() => onEndMission(true, true)}>🎉 2人とも成功！</button>
+              <button className="btn-pop btn-green" onClick={() => onEndMission(true, true, reachedFirstDest)}>🎉 2人とも成功！</button>
               {squareType !== 'green' && (
                 <div style={{ display: 'flex', gap: '15px' }}>
-                  <button className="btn-pop btn-blue" onClick={() => onEndMission(true, false)}>👍 あなたのみ</button>
-                  <button className="btn-pop btn-yellow" onClick={() => onEndMission(false, true)}>👎 相手のみ</button>
+                  <button className="btn-pop btn-blue" onClick={() => onEndMission(true, false, reachedFirstDest)}>👍 あなたのみ</button>
+                  <button className="btn-pop btn-yellow" onClick={() => onEndMission(false, true, reachedFirstDest)}>👎 相手のみ</button>
                 </div>
               )}
-              <button className="btn-pop btn-gray" onClick={() => onEndMission(false, false)}>😭 2人とも失敗...</button>
+              <button className="btn-pop btn-gray" onClick={() => onEndMission(false, false, reachedFirstDest)}>😭 2人とも失敗...</button>
             </div>
           </div>
         ) : (
           <p style={{ color: '#747d8c', fontWeight: '800', fontSize: '1.1rem' }}>⏳ 代表者が結果を入力しています...</p>
+        )}
+      </div>
+    </>
+  );
+};
+
+// --- ⑤.5 リアル出費入力 UI ---
+export const SpendingPhaseUI: React.FC<{
+  spentInput: string; setSpentInput: (val: string) => void;
+  mySpending: number | undefined; opponentSpending: number | undefined;
+  bothSubmitted: boolean; isMyTurn: boolean;
+  onSubmitSpending: () => void; onFinishSpending: () => void;
+}> = ({ spentInput, setSpentInput, mySpending, opponentSpending, bothSubmitted, isMyTurn, onSubmitSpending, onFinishSpending }) => {
+  return (
+    <>
+      <h3 style={{ margin: '0 0 15px 0', color: '#e67e22', fontWeight: '800', fontSize: '1.3rem' }}>💸 リアル出費の入力</h3>
+      <div style={{ padding: '20px', background: '#fdf2e9', borderRadius: '16px', marginBottom: '15px', border: '4px solid #f39c12' }}>
+        {mySpending === undefined ? (
+          <div style={{ textAlign: 'left' }}>
+            <p style={{ margin: '0 0 10px 0', fontWeight: '800', fontSize: '1.05rem', color: '#2c3e50' }}>この駅での滞在中に、現実で使ったお金（飲食代や雑費など）を入力してください。</p>
+            <p style={{ margin: '0 0 15px 0', fontSize: '0.9rem', color: '#e74c3c', fontWeight: 'bold' }}>※使っていない場合は「0」と入力してください。</p>
+            <input 
+              type="text" 
+              inputMode="numeric" 
+              pattern="[0-9]*"
+              placeholder="例: 500 (使っていない場合は 0)" 
+              style={{ width: '100%', padding: '15px', borderRadius: '8px', border: '3px solid #bdc3c7', fontSize: '1.2rem', fontWeight: '800', boxSizing: 'border-box', outline: 'none', marginBottom: '20px' }} 
+              value={spentInput} 
+              onChange={(e) => {
+                const val = e.target.value.replace(/[^0-9]/g, '');
+                setSpentInput(val);
+              }} 
+            />
+            <button className="btn-pop btn-orange" onClick={onSubmitSpending} style={{ width: '100%' }}>
+              確定する
+            </button>
+          </div>
+        ) : (
+          <div style={{ padding: '30px 20px', textAlign: 'center', background: '#fff', borderRadius: '16px', border: '4px solid #2ecc71', boxShadow: '0 8px 0 rgba(46,204,113,0.3)' }}>
+            <div style={{ fontSize: '3.5rem', marginBottom: '15px' }}>✅</div>
+            <p style={{ fontWeight: '800', color: '#27ae60', fontSize: '1.2rem', margin: '0 0 10px 0' }}>入力が完了しました！</p>
+            {opponentSpending === undefined && <p style={{ color: '#7f8c8d', fontSize: '1rem', fontWeight: 'bold', margin: 0 }}>相手の入力を待っています...</p>}
+          </div>
+        )}
+        
+        {bothSubmitted && isMyTurn && (
+          <div style={{ marginTop: '25px', borderTop: '3px dashed #f39c12', paddingTop: '20px' }}>
+            <p style={{ fontWeight: '800', color: '#e74c3c', fontSize: '1.2rem', marginBottom: '15px' }}>🎉 2人の入力が完了しました！</p>
+            <button className="btn-pop" onClick={onFinishSpending}>精算して「物件入札」へ</button>
+          </div>
         )}
       </div>
     </>
@@ -428,7 +603,6 @@ export const BiddingPhaseUI: React.FC<{
                         style={{ width: '100%', padding: '15px', borderRadius: '8px', border: '3px solid #bdc3c7', fontSize: '1.2rem', fontWeight: '800', boxSizing: 'border-box', outline: 'none' }} 
                         value={bidAmount || ''} 
                         onChange={(e) => {
-                          // 🔑 数字以外（ハイフンやカンマなど）が入力されたら強制削除
                           const val = e.target.value.replace(/[^0-9]/g, '');
                           setBidAmount(val ? Number(val) : 0);
                         }} 
@@ -625,55 +799,5 @@ export const AnimatedRoulette: React.FC<{ isSpinning: boolean; result: number | 
         </motion.div>
       )}
     </div>
-  );
-};
-// --- ⑤.5 リアル出費入力 UI ---
-export const SpendingPhaseUI: React.FC<{
-  spentInput: string; setSpentInput: (val: string) => void;
-  mySpending: number | undefined; opponentSpending: number | undefined;
-  bothSubmitted: boolean; isMyTurn: boolean;
-  onSubmitSpending: () => void; onFinishSpending: () => void;
-}> = ({ spentInput, setSpentInput, mySpending, opponentSpending, bothSubmitted, isMyTurn, onSubmitSpending, onFinishSpending }) => {
-  return (
-    <>
-      <h3 style={{ margin: '0 0 15px 0', color: '#e67e22', fontWeight: '800', fontSize: '1.3rem' }}>💸 リアル出費の入力</h3>
-      <div style={{ padding: '20px', background: '#fdf2e9', borderRadius: '16px', marginBottom: '15px', border: '4px solid #f39c12' }}>
-        {mySpending === undefined ? (
-          <div style={{ textAlign: 'left' }}>
-            <p style={{ margin: '0 0 10px 0', fontWeight: '800', fontSize: '1.05rem', color: '#2c3e50' }}>この駅での滞在中に、現実で使ったお金（飲食代や雑費など）を入力してください。</p>
-            <p style={{ margin: '0 0 15px 0', fontSize: '0.9rem', color: '#e74c3c', fontWeight: 'bold' }}>※使っていない場合は「0」と入力してください。</p>
-            <input 
-              type="text" 
-              inputMode="numeric" 
-              pattern="[0-9]*"
-              placeholder="例: 500 (使っていない場合は 0)" 
-              style={{ width: '100%', padding: '15px', borderRadius: '8px', border: '3px solid #bdc3c7', fontSize: '1.2rem', fontWeight: '800', boxSizing: 'border-box', outline: 'none', marginBottom: '20px' }} 
-              value={spentInput} 
-              onChange={(e) => {
-                // 🔑 数字以外が入力されたら強制的に消去する！
-                const val = e.target.value.replace(/[^0-9]/g, '');
-                setSpentInput(val);
-              }} 
-            />
-            <button className="btn-pop btn-orange" onClick={onSubmitSpending} style={{ width: '100%' }}>
-              確定する
-            </button>
-          </div>
-        ) : (
-          <div style={{ padding: '30px 20px', textAlign: 'center', background: '#fff', borderRadius: '16px', border: '4px solid #2ecc71', boxShadow: '0 8px 0 rgba(46,204,113,0.3)' }}>
-            <div style={{ fontSize: '3.5rem', marginBottom: '15px' }}>✅</div>
-            <p style={{ fontWeight: '800', color: '#27ae60', fontSize: '1.2rem', margin: '0 0 10px 0' }}>入力が完了しました！</p>
-            {opponentSpending === undefined && <p style={{ color: '#7f8c8d', fontSize: '1rem', fontWeight: 'bold', margin: 0 }}>相手の入力を待っています...</p>}
-          </div>
-        )}
-        
-        {bothSubmitted && isMyTurn && (
-          <div style={{ marginTop: '25px', borderTop: '3px dashed #f39c12', paddingTop: '20px' }}>
-            <p style={{ fontWeight: '800', color: '#e74c3c', fontSize: '1.2rem', marginBottom: '15px' }}>🎉 2人の入力が完了しました！</p>
-            <button className="btn-pop" onClick={onFinishSpending}>精算して「物件入札」へ</button>
-          </div>
-        )}
-      </div>
-    </>
   );
 };
