@@ -1,19 +1,18 @@
-import React, { useState, useEffect } from 'react'; // 🔑 useEffect を追加
+import React, { useState, useEffect } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 
 type Props = {
   onHostGame: (name: string) => Promise<string>;
   onJoinGame: (roomId: string, name: string) => Promise<void>;
+  savedRoomId: string | null;         // 🔑 追加
+  onResumeGame: () => void;           // 🔑 追加
 };
 
-// 画面の進行ステップ
 type ScreenStep = 'tap_start' | 'home' | 'route_select' | 'room_setup';
 
-export const TitlePage: React.FC<Props> = ({ onHostGame, onJoinGame }) => {
-  // 画面状態
+export const TitlePage: React.FC<Props> = ({ onHostGame, onJoinGame, savedRoomId, onResumeGame }) => {
   const [step, setStep] = useState<ScreenStep>('tap_start');
   
-  // 部屋作成・参加の状態
   const [playerName, setPlayerName] = useState('');
   const [inputRoomId, setInputRoomId] = useState('');
   const [createdRoomId, setCreatedRoomId] = useState<string | null>(null);
@@ -21,29 +20,24 @@ export const TitlePage: React.FC<Props> = ({ onHostGame, onJoinGame }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-// 🔑 追加：URLの情報を読み取って画面をスキップする処理
-useEffect(() => {
-  const params = new URLSearchParams(window.location.search);
-  const urlRoomId = params.get('roomId');
-  const stepParam = params.get('step'); // 🔑 追加：ステップの合図を受け取る
-  
-  if (urlRoomId) {
-    // 招待URLから来た場合
-    setInputRoomId(urlRoomId.toUpperCase());
-    setStep('room_setup');
-    setMode('join');
-  } else if (stepParam === 'route_select') {
-    // 🔑 追加：退出ボタン等から戻ってきた場合、ルート選択画面からスタート
-    setStep('route_select');
-  }
-}, []);
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const urlRoomId = params.get('roomId');
+    const stepParam = params.get('step'); 
+    
+    if (urlRoomId) {
+      setInputRoomId(urlRoomId.toUpperCase());
+      setStep('room_setup');
+      setMode('join');
+    } else if (stepParam === 'route_select') {
+      setStep('route_select');
+    }
+  }, []);
 
-  // 1. 部屋を作る処理
   const handleHost = async () => {
     setLoading(true);
     setError('');
     try {
-      // 名前が未入力の場合は「プレイヤー1」をデフォルト名に
       const finalName = playerName.trim() !== '' ? playerName.trim() : 'プレイヤー1';
       const roomId = await onHostGame(finalName);
       setCreatedRoomId(roomId);
@@ -54,7 +48,6 @@ useEffect(() => {
     }
   };
 
-  // 2. 部屋に入る処理
   const handleJoin = async () => {
     if (!inputRoomId.trim()) {
       setError('部屋番号を入力してください');
@@ -63,7 +56,6 @@ useEffect(() => {
     setLoading(true);
     setError('');
     try {
-      // 名前が未入力の場合は「プレイヤー2」をデフォルト名に
       const finalName = playerName.trim() !== '' ? playerName.trim() : 'プレイヤー2';
       await onJoinGame(inputRoomId.trim().toUpperCase(), finalName);
     } catch (err: any) {
@@ -73,31 +65,26 @@ useEffect(() => {
     }
   };
 
-  // スマホでQRを読んだ時に直接アクセスできるURLを作成
   const inviteUrl = createdRoomId 
     ? `${window.location.origin}?roomId=${createdRoomId}`
     : '';
 
-// -------------------------------------------------------------
-  // 画面①: タップしてスタート
-  // -------------------------------------------------------------
   if (step === 'tap_start') {
     return (
       <div 
         onClick={() => setStep('home')}
         style={{
-          height: '100dvh', // 🔑 vh から dvh に変更（スマホのアドレスバーの影響を防ぐ）
-          width: '100%',    // 🔑 vw から % に変更（横揺れ防止）
+          height: '100dvh', 
+          width: '100%',    
           display: 'flex',
           flexDirection: 'column',
           alignItems: 'center',
           justifyContent: 'flex-end',
           paddingBottom: '15vh',
+          boxSizing: 'border-box', 
+          overflow: 'hidden',      
           backgroundImage: 'url(/home.png)',
-          
-          // 🔑 もし画像の両端が切れてしまうのが嫌な場合は、'cover' を 'contain' に変えてみてください
           backgroundSize: 'cover', 
-          
           backgroundPosition: 'center',
           backgroundRepeat: 'no-repeat',
           cursor: 'pointer',
@@ -117,23 +104,25 @@ useEffect(() => {
       </div>
     );
   }
-  // -------------------------------------------------------------
-  // 画面②: ホーム画面（ゲームモード選択）
-  // -------------------------------------------------------------
+
   if (step === 'home') {
     return (
       <div style={containerStyle}>
         <h2>🏠 ホーム画面</h2>
         <p>プレイするモードを選んでください</p>
         <div style={{ marginTop: '30px', display: 'flex', flexDirection: 'column', gap: '15px' }}>
+          
+          {/* 🔑 前回の続きがある場合のみボタンを表示 */}
+          {savedRoomId && (
+            <button style={{ ...primaryBtnStyle, background: '#3498db', boxShadow: '0 4px 0 #2980b9' }} onClick={onResumeGame}>
+              ▶️ 前回の続きから遊ぶ
+            </button>
+          )}
+
           <button style={primaryBtnStyle} onClick={() => setStep('route_select')}>
-            ⚔️ 2人で対戦（オンライン）
-          </button>
-          <button style={{ ...primaryBtnStyle, opacity: 0.5, cursor: 'not-allowed' }} disabled>
-            🤖 1人で遊ぶ（準備中）
+            ⚔️ 2人で対戦（部屋を作る/入る）
           </button>
           
-          {/* 🔑 タイトルに戻るボタンを追加 */}
           <button style={backBtnStyle} onClick={() => setStep('tap_start')}>
             ⬅️ タイトルに戻る
           </button>
@@ -142,9 +131,6 @@ useEffect(() => {
     );
   }
 
-  // -------------------------------------------------------------
-  // 画面③: ルート選択画面
-  // -------------------------------------------------------------
   if (step === 'route_select') {
     return (
       <div style={containerStyle}>
@@ -162,14 +148,10 @@ useEffect(() => {
     );
   }
 
-  // -------------------------------------------------------------
-  // 画面④: 部屋作成・参加画面
-  // -------------------------------------------------------------
   return (
     <div style={containerStyle}>
       <h2>🚃 新宿 〜 高尾山口編</h2>
 
-      {/* プレイヤー名入力 */}
       <div style={{ marginBottom: '20px', textAlign: 'left' }}>
         <label style={{ display: 'block', fontSize: '0.9rem', marginBottom: '5px', fontWeight: 'bold' }}>
           プレイヤー名（空欄なら自動設定）:
@@ -185,7 +167,6 @@ useEffect(() => {
 
       {error && <p style={{ color: 'red', fontSize: '0.9rem' }}>{error}</p>}
 
-      {/* モード未選択 */}
       {mode === 'menu' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
           <button style={primaryBtnStyle} onClick={() => { setMode('host'); handleHost(); }}>
@@ -200,7 +181,6 @@ useEffect(() => {
         </div>
       )}
 
-      {/* ホスト：部屋作成完了画面 */}
       {mode === 'host' && (
         <div>
           {loading ? (
@@ -212,7 +192,6 @@ useEffect(() => {
                 {createdRoomId}
               </div>
               
-              {/* QRコード */}
               {inviteUrl && (
                 <div style={{ background: '#fff', padding: '10px', display: 'inline-block', borderRadius: '8px' }}>
                   <QRCodeSVG value={inviteUrl} size={160} />
@@ -227,7 +206,6 @@ useEffect(() => {
         </div>
       )}
 
-      {/* ゲスト：部屋参加入力画面 */}
       {mode === 'join' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
           <input
@@ -249,7 +227,6 @@ useEffect(() => {
   );
 };
 
-// 簡易スタイル定義
 const containerStyle: React.CSSProperties = {
   maxWidth: '400px',
   margin: '40px auto',
@@ -279,7 +256,8 @@ const primaryBtnStyle: React.CSSProperties = {
   fontSize: '1rem',
   fontWeight: 'bold',
   cursor: 'pointer',
+  boxShadow: '0 4px 0 #c0392b',
 };
 
-const secondaryBtnStyle: React.CSSProperties = { ...primaryBtnStyle, background: '#2ed573' };
-const backBtnStyle: React.CSSProperties = { ...primaryBtnStyle, background: '#a4b0be' };
+const secondaryBtnStyle: React.CSSProperties = { ...primaryBtnStyle, background: '#2ed573', boxShadow: '0 4px 0 #27ae60' };
+const backBtnStyle: React.CSSProperties = { ...primaryBtnStyle, background: '#a4b0be', boxShadow: '0 4px 0 #747d8c' };
