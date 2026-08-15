@@ -7,7 +7,7 @@ import { GameHeader, PlayerCards, GameMapView, BottomNav, AnimatedDice, Animated
 import { motion, AnimatePresence } from 'framer-motion';
 import { doc, updateDoc } from 'firebase/firestore';
 import { db } from '../firebase';
-import { QRCodeSVG } from 'qrcode.react'; // 🔑 QRコード生成ライブラリを追加
+import { QRCodeSVG } from 'qrcode.react'; 
 import '../styles/index.css'; 
 
 type Props = { roomId: string; userId: string; };
@@ -31,7 +31,6 @@ export const GamePage: React.FC<Props> = ({ roomId, userId }) => {
   const actions = useTurnActions(roomId, userId, roomData, me, opponent, opponentId, currentProperties);
   const phase = roomData?.phase || 'dice';
 
-  // 🔑 追加: 自分のオンライン状態（離脱）の検知と更新
   useEffect(() => {
     if (!roomId || !userId) return;
     
@@ -45,15 +44,12 @@ export const GamePage: React.FC<Props> = ({ roomId, userId }) => {
       }
     };
 
-    // 画面を開いた時にオンラインにする
     setOnlineStatus(true);
 
-    // タブ切り替えやバックグラウンド移行時の処理
     const handleVisibilityChange = () => {
       setOnlineStatus(document.visibilityState === 'visible');
     };
 
-    // ブラウザを閉じる・リロード時の処理
     const handleBeforeUnload = () => {
       setOnlineStatus(false);
     };
@@ -111,9 +107,8 @@ export const GamePage: React.FC<Props> = ({ roomId, userId }) => {
     return true;
   });
 
-  // 🔑 追加: 相手がいない・抜けた場合のブロック画面を最優先で表示
   const opponentIsOffline = opponentId && opponent && opponent.isOnline === false;
-  const waitingForOpponent = !opponentId; // 最初、まだ相手が入ってきていない時
+  const waitingForOpponent = !opponentId; 
   
   if (waitingForOpponent || opponentIsOffline) {
     return (
@@ -134,9 +129,31 @@ export const GamePage: React.FC<Props> = ({ roomId, userId }) => {
         <div style={{ background: '#fff', padding: '20px', borderRadius: '16px', display: 'inline-block', marginBottom: '20px' }}>
           <QRCodeSVG value={inviteUrl} size={180} />
         </div>
-        <p style={{ color: '#fbc02d', fontSize: '1.4rem', fontWeight: '900', letterSpacing: '3px', marginBottom: '20px', textShadow: '0 2px 4px rgba(0,0,0,0.5)' }}>
-          ID: {roomId}
-        </p>
+        
+        {/* 🔑 修正: 「ルームID」に変更し、コピーボタンを追加 */}
+        <div style={{ marginBottom: '25px' }}>
+          <p style={{ color: '#fbc02d', fontSize: '1.4rem', fontWeight: '900', letterSpacing: '3px', margin: '0 0 10px 0', textShadow: '0 2px 4px rgba(0,0,0,0.5)' }}>
+            ルームID: {roomId}
+          </p>
+          <button 
+            onClick={handleCopyRoomId}
+            style={{
+              background: copySuccess ? '#27ae60' : '#34495e',
+              color: '#fff',
+              border: 'none',
+              padding: '10px 20px',
+              borderRadius: '8px',
+              fontWeight: 'bold',
+              fontSize: '1rem',
+              cursor: 'pointer',
+              boxShadow: '0 4px 0 rgba(0,0,0,0.3)',
+              transition: 'background 0.3s'
+            }}
+          >
+            {copySuccess ? '✅ コピー完了！' : '📋 ルームIDをコピー'}
+          </button>
+        </div>
+
         <p style={{ color: '#bdc3c7', fontSize: '0.95rem', fontWeight: 'bold' }}>
           {waitingForOpponent ? '相手が参加すると自動でゲームが始まります。' : '相手が画面を開いて戻ってくると\n自動で再開します。'}
         </p>
@@ -144,7 +161,6 @@ export const GamePage: React.FC<Props> = ({ roomId, userId }) => {
     );
   }
 
-  // カバンがいっぱいの時の処理
   if (myItems.length > 3) {
     return (
       <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.85)', zIndex: 99999, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
