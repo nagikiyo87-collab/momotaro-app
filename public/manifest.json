@@ -1,5 +1,5 @@
 {
-    "short_name": "桃鉄リアル",
+    "short_name": "リアル桃鉄",
     "name": "リアル体験すごろく - 桃鉄アプリ",
     "icons": [
       {
@@ -14,7 +14,7 @@
         "purpose": "any maskable"
       }
     ],
-    "start_url": "/?step=route_select",
+    "start_url": "/",
     "background_color": "#ffffff",
     "theme_color": "#ff4757",
     "display": "standalone",
