@@ -1,4 +1,4 @@
-import { StrictMode, useState } from 'react';
+import { StrictMode, useState, useEffect } from 'react';
 import { createRoot } from 'react-dom/client';
 import './styles/index.css';
 
@@ -8,7 +8,6 @@ import { GamePage } from './pages/GamePage';
 import { useGameActions } from './hooks/useGameActions';
 import { useAuth } from './hooks/useAuth';
 
-// Firestoreを直接読み込むためのimport
 import { doc, getDoc } from 'firebase/firestore';
 import { db } from './firebase';
 
@@ -17,8 +16,27 @@ const App = () => {
   const { userId } = useAuth();
   const [joinedRoomId, setJoinedRoomId] = useState<string | null>(null);
 
-  // 🔑 ローカルストレージに保存された前回の部屋IDを取得
   const savedRoomId = localStorage.getItem('savedRoomId');
+
+  // 🔑 修正: セッションストレージを使って、リロード時はそのままゲーム画面に復帰させる
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const urlRoomId = params.get('roomId');
+
+    if (!urlRoomId && savedRoomId) {
+      // 現在のタブのセッション履歴を確認
+      const isSessionActive = sessionStorage.getItem('isSessionActive');
+      if (isSessionActive) {
+        // リロード時: セッションが生きているので即座にゲーム画面へ復帰
+        setJoinedRoomId(savedRoomId);
+      } else {
+        // PWA起動時・新規タブ時: タイトル画面を表示させるためフラグだけ立てる
+        sessionStorage.setItem('isSessionActive', 'true');
+      }
+    } else {
+      sessionStorage.setItem('isSessionActive', 'true');
+    }
+  }, [savedRoomId]);
 
   const handleHostGame = async (playerName: string) => {
     if (!userId) throw new Error("通信の準備ができていません");
@@ -50,7 +68,6 @@ const App = () => {
     setJoinedRoomId(roomId); 
   };
 
-  // 🔑 追加: タイトル画面から「続きから遊ぶ」を押された時の処理
   const handleResumeGame = () => {
     if (savedRoomId) {
       setJoinedRoomId(savedRoomId);
@@ -65,8 +82,8 @@ const App = () => {
     <TitlePage
       onHostGame={handleHostGame}
       onJoinGame={handleJoinGame}
-      savedRoomId={savedRoomId}           // 🔑 TitlePageに渡す
-      onResumeGame={handleResumeGame}     // 🔑 TitlePageに渡す
+      savedRoomId={savedRoomId}
+      onResumeGame={handleResumeGame}
     />
   );
 };
@@ -79,7 +96,6 @@ createRoot(document.getElementById('root')!).render(
   </StrictMode>,
 );
 
-// Service Workerの自動登録
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('/sw.js').catch((err) => {

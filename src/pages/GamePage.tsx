@@ -7,6 +7,7 @@ import { GameHeader, PlayerCards, GameMapView, BottomNav, AnimatedDice, Animated
 import { motion, AnimatePresence } from 'framer-motion';
 import { doc, updateDoc } from 'firebase/firestore';
 import { db } from '../firebase';
+import { QRCodeSVG } from 'qrcode.react'; // 🔑 QRコード生成ライブラリを追加
 import '../styles/index.css'; 
 
 type Props = { roomId: string; userId: string; };
@@ -29,6 +30,44 @@ export const GamePage: React.FC<Props> = ({ roomId, userId }) => {
 
   const actions = useTurnActions(roomId, userId, roomData, me, opponent, opponentId, currentProperties);
   const phase = roomData?.phase || 'dice';
+
+  // 🔑 追加: 自分のオンライン状態（離脱）の検知と更新
+  useEffect(() => {
+    if (!roomId || !userId) return;
+    
+    const setOnlineStatus = async (isOnline: boolean) => {
+      try {
+        await updateDoc(doc(db, 'rooms', roomId), {
+          [`players.${userId}.isOnline`]: isOnline
+        });
+      } catch (e) {
+        console.error("ステータス更新エラー", e);
+      }
+    };
+
+    // 画面を開いた時にオンラインにする
+    setOnlineStatus(true);
+
+    // タブ切り替えやバックグラウンド移行時の処理
+    const handleVisibilityChange = () => {
+      setOnlineStatus(document.visibilityState === 'visible');
+    };
+
+    // ブラウザを閉じる・リロード時の処理
+    const handleBeforeUnload = () => {
+      setOnlineStatus(false);
+    };
+
+    window.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('beforeunload', handleBeforeUnload);
+
+    return () => {
+      window.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+      setOnlineStatus(false);
+    };
+  }, [roomId, userId]);
+
 
   const handleAdjustMoney = async (amount: number) => {
     const currentMoney = me?.money || 0;
@@ -72,6 +111,40 @@ export const GamePage: React.FC<Props> = ({ roomId, userId }) => {
     return true;
   });
 
+  // 🔑 追加: 相手がいない・抜けた場合のブロック画面を最優先で表示
+  const opponentIsOffline = opponentId && opponent && opponent.isOnline === false;
+  const waitingForOpponent = !opponentId; // 最初、まだ相手が入ってきていない時
+  
+  if (waitingForOpponent || opponentIsOffline) {
+    return (
+      <div style={{
+        position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+        background: 'rgba(0,0,0,0.9)', zIndex: 999999,
+        display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+        padding: '20px', textAlign: 'center', backdropFilter: 'blur(10px)'
+      }}>
+        <h2 style={{ color: waitingForOpponent ? '#f1c40f' : '#e74c3c', fontSize: '1.6rem', marginBottom: '15px' }}>
+          {waitingForOpponent ? '⏳ 相手を待っています' : '⚠️ 相手が退出しました'}
+        </h2>
+        <p style={{ color: '#fff', marginBottom: '25px', fontWeight: 'bold', lineHeight: '1.6' }}>
+          {waitingForOpponent 
+            ? '以下のQRコードを読み取ってもらうか、\nルームIDを共有して招待してください。'
+            : '相手がアプリを閉じたか、通信が切断されました。\n復帰するまでゲームを進行できません。'}
+        </p>
+        <div style={{ background: '#fff', padding: '20px', borderRadius: '16px', display: 'inline-block', marginBottom: '20px' }}>
+          <QRCodeSVG value={inviteUrl} size={180} />
+        </div>
+        <p style={{ color: '#fbc02d', fontSize: '1.4rem', fontWeight: '900', letterSpacing: '3px', marginBottom: '20px', textShadow: '0 2px 4px rgba(0,0,0,0.5)' }}>
+          ID: {roomId}
+        </p>
+        <p style={{ color: '#bdc3c7', fontSize: '0.95rem', fontWeight: 'bold' }}>
+          {waitingForOpponent ? '相手が参加すると自動でゲームが始まります。' : '相手が画面を開いて戻ってくると\n自動で再開します。'}
+        </p>
+      </div>
+    );
+  }
+
+  // カバンがいっぱいの時の処理
   if (myItems.length > 3) {
     return (
       <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.85)', zIndex: 99999, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
@@ -245,7 +318,6 @@ export const GamePage: React.FC<Props> = ({ roomId, userId }) => {
                     <BiddingPhaseUI stayTime={roomData?.stayTime || 0} currentProperties={currentProperties} selectedPropertyId={actions.selectedPropertyId} setSelectedPropertyId={actions.setSelectedPropertyId} bidAmount={actions.bidAmount} setBidAmount={actions.setBidAmount} myBid={roomData?.bids?.[userId]} opponentBid={roomData?.bids?.[opponentId!]} bothSubmitted={!!(roomData?.bids?.[userId] && roomData?.bids?.[opponentId!])} isMyTurn={isMyTurn} onSubmitBid={actions.handleSubmitBid} onRevealBids={() => actions.handleRevealBids(roomData.bids[userId], roomData.bids[opponentId!])} myMoney={me?.money || 0} />
                   )}
 
-                  {/* 🔑 修正: 憑いている人がボタンを押せるように修正し、テストボタンを削除 */}
                   {phase === 'bomby' && (
                     <div>
                       <h3 style={{ margin: '0 0 15px 0', color: '#8e44ad', fontWeight: '800' }}>⚠️ 貧乏神のターン！</h3>
