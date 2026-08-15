@@ -87,6 +87,14 @@ export const GamePage: React.FC<Props> = ({ roomId, userId }) => {
     navigator.clipboard.writeText(roomId).then(() => { setCopySuccess(true); setTimeout(() => setCopySuccess(false), 2000); });
   };
 
+  // 🔑 追加：待機画面から退出する処理
+  const handleQuit = () => {
+    if (window.confirm("ゲームを一時退出してタイトル画面に戻りますか？\n（同じルームIDを入力すれば元の状態に復帰できます）")) {
+      localStorage.removeItem('savedRoomId');
+      window.location.href = '/?step=route_select';
+    }
+  };
+
   const inviteUrl = `${window.location.origin}?roomId=${roomId}`;
   const myItems: string[] = me?.items || [];
   const currentMissions = roomData?.currentMissions || {};
@@ -130,27 +138,47 @@ export const GamePage: React.FC<Props> = ({ roomId, userId }) => {
           <QRCodeSVG value={inviteUrl} size={180} />
         </div>
         
-        {/* 🔑 修正: 「ルームID」に変更し、コピーボタンを追加 */}
-        <div style={{ marginBottom: '25px' }}>
-          <p style={{ color: '#fbc02d', fontSize: '1.4rem', fontWeight: '900', letterSpacing: '3px', margin: '0 0 10px 0', textShadow: '0 2px 4px rgba(0,0,0,0.5)' }}>
+        {/* 🔑 ボタンを縦に並べて押しやすく配置 */}
+        <div style={{ marginBottom: '25px', display: 'flex', flexDirection: 'column', gap: '12px', alignItems: 'center', width: '100%' }}>
+          <p style={{ color: '#fbc02d', fontSize: '1.4rem', fontWeight: '900', letterSpacing: '3px', margin: '0 0 5px 0', textShadow: '0 2px 4px rgba(0,0,0,0.5)' }}>
             ルームID: {roomId}
           </p>
           <button 
             onClick={handleCopyRoomId}
             style={{
+              width: '100%', maxWidth: '280px',
               background: copySuccess ? '#27ae60' : '#34495e',
               color: '#fff',
               border: 'none',
-              padding: '10px 20px',
+              padding: '12px 20px',
               borderRadius: '8px',
               fontWeight: 'bold',
-              fontSize: '1rem',
+              fontSize: '1.05rem',
               cursor: 'pointer',
               boxShadow: '0 4px 0 rgba(0,0,0,0.3)',
               transition: 'background 0.3s'
             }}
           >
             {copySuccess ? '✅ コピー完了！' : '📋 ルームIDをコピー'}
+          </button>
+
+          {/* 🔑 退出用のボタン */}
+          <button 
+            onClick={handleQuit}
+            style={{
+              width: '100%', maxWidth: '280px',
+              background: '#e74c3c',
+              color: '#fff',
+              border: 'none',
+              padding: '12px 20px',
+              borderRadius: '8px',
+              fontWeight: 'bold',
+              fontSize: '1.05rem',
+              cursor: 'pointer',
+              boxShadow: '0 4px 0 #c0392b'
+            }}
+          >
+            🚪 ゲームを退出する
           </button>
         </div>
 
