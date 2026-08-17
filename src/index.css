@@ -1,111 +1,51 @@
-:root {
-  --text: #6b6375;
-  --text-h: #08060d;
-  --bg: #fff;
-  --border: #e5e4e7;
-  --code-bg: #f4f3ec;
-  --accent: #aa3bff;
-  --accent-bg: rgba(170, 59, 255, 0.1);
-  --accent-border: rgba(170, 59, 255, 0.5);
-  --social-bg: rgba(244, 243, 236, 0.5);
-  --shadow:
-    rgba(0, 0, 0, 0.1) 0 10px 15px -3px, rgba(0, 0, 0, 0.05) 0 4px 6px -2px;
-
-  --sans: system-ui, 'Segoe UI', Roboto, sans-serif;
-  --heading: system-ui, 'Segoe UI', Roboto, sans-serif;
-  --mono: ui-monospace, Consolas, monospace;
-
-  font: 18px/145% var(--sans);
-  letter-spacing: 0.18px;
-  color-scheme: light dark;
-  color: var(--text);
-  background: var(--bg);
-  font-synthesis: none;
-  text-rendering: optimizeLegibility;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-
-  @media (max-width: 1024px) {
-    font-size: 16px;
-  }
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --text: #9ca3af;
-    --text-h: #f3f4f6;
-    --bg: #16171d;
-    --border: #2e303a;
-    --code-bg: #1f2028;
-    --accent: #c084fc;
-    --accent-bg: rgba(192, 132, 252, 0.15);
-    --accent-border: rgba(192, 132, 252, 0.5);
-    --social-bg: rgba(47, 48, 58, 0.5);
-    --shadow:
-      rgba(0, 0, 0, 0.4) 0 10px 15px -3px, rgba(0, 0, 0, 0.25) 0 4px 6px -2px;
-  }
-
-  #social .button-icon {
-    filter: invert(1) brightness(2);
-  }
-}
-
-#root {
-  width: 1126px;
-  max-width: 100%;
-  margin: 0 auto;
-  text-align: center;
-  border-inline: 1px solid var(--border);
-  min-height: 100svh;
-  display: flex;
-  flex-direction: column;
-  box-sizing: border-box;
-}
-
-body {
+/* ----------------------------------------
+   📱 スマホ全画面アプリ（PWA）用のリセット設定
+---------------------------------------- */
+html, body, #root {
   margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+  
+  /* 🔑 空白対策: 背景を白で完全に塗りつぶす */
+  background-color: #ffffff;
+  
+  /* 🔑 iOS特有の余計なスクロール（バウンス）やスワイプバックを防ぐ */
+  overscroll-behavior-y: none;
+  -webkit-overflow-scrolling: touch;
+  
+  /* スマホでのタップ時の変な青枠を消す */
+  -webkit-tap-highlight-color: transparent;
+  
+  /* デフォルトのフォント設定 */
+  font-family: system-ui, -apple-system, sans-serif;
+  color: #2f3542;
 }
 
-h1,
-h2 {
-  font-family: var(--heading);
-  font-weight: 500;
-  color: var(--text-h);
+/* ----------------------------------------
+   🎨 共通ボタンスタイル（すでに設定している場合は維持してください）
+---------------------------------------- */
+.btn-pop {
+  border: none;
+  border-radius: 12px;
+  padding: 12px 20px;
+  font-weight: 900;
+  font-size: 1.1rem;
+  cursor: pointer;
+  width: 100%;
+  transition: transform 0.1s;
+  background: #bdc3c7;
+  color: #fff;
+  box-shadow: 0 4px 0 #95a5a6;
+}
+.btn-pop:active {
+  transform: translateY(4px);
+  box-shadow: none !important;
 }
 
-h1 {
-  font-size: 56px;
-  letter-spacing: -1.68px;
-  margin: 32px 0;
-  @media (max-width: 1024px) {
-    font-size: 36px;
-    margin: 20px 0;
-  }
-}
-h2 {
-  font-size: 24px;
-  line-height: 118%;
-  letter-spacing: -0.24px;
-  margin: 0 0 8px;
-  @media (max-width: 1024px) {
-    font-size: 20px;
-  }
-}
-p {
-  margin: 0;
-}
-
-code,
-.counter {
-  font-family: var(--mono);
-  display: inline-flex;
-  border-radius: 4px;
-  color: var(--text-h);
-}
-
-code {
-  font-size: 15px;
-  line-height: 135%;
-  padding: 4px 8px;
-  background: var(--code-bg);
-}
+.btn-yellow { background: #f1c40f; color: #d35400; box-shadow: 0 4px 0 #f39c12; }
+.btn-green  { background: #2ecc71; color: #fff; box-shadow: 0 4px 0 #27ae60; }
+.btn-blue   { background: #3498db; color: #fff; box-shadow: 0 4px 0 #2980b9; }
+.btn-purple { background: #9b59b6; color: #fff; box-shadow: 0 4px 0 #8e44ad; }
+.btn-orange { background: #e67e22; color: #fff; box-shadow: 0 4px 0 #d35400; }
+.btn-gray   { background: #95a5a6; color: #fff; box-shadow: 0 4px 0 #7f8c8d; }

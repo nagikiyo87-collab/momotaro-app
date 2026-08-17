@@ -222,16 +222,13 @@ export const GameMapView: React.FC<{ currentStationName: string; sharedPosition:
 
 export const BottomNav: React.FC<{ activeTab: 'main' | 'map'; onChangeTab: (tab: 'main' | 'map') => void }> = ({ activeTab, onChangeTab }) => (
   <div style={{ 
-    position: 'fixed', bottom: 0, left: 0, width: '100%', 
+    position: 'fixed', bottom: 0, left: 0, right: 0, // width:100% ではなく left/right:0 で画面幅に完全固定
     backgroundColor: '#fff', borderTop: '3px solid #ecf0f1', 
     display: 'flex', justifyContent: 'space-evenly', 
     paddingTop: '10px',
-    // 🔑 修正: iPhoneの黒い線（ホームバー）の分だけ正確に余白を取る
-    paddingBottom: 'env(safe-area-inset-bottom)',
-    // 🔑 追加: メニューのアイコン部分自体の高さを固定
-    height: '60px',
-    boxSizing: 'content-box', // padding分を高さに追加する設定
-    zIndex: 100, boxShadow: '0 -4px 15px rgba(0,0,0,0.05)' 
+    /* 🔑 修正: 安全領域（ホームバー）＋ 基本の余白10px。非対応機種用には0pxを代入 */
+    paddingBottom: 'calc(10px + env(safe-area-inset-bottom, 0px))',
+    zIndex: 1000, boxShadow: '0 -4px 15px rgba(0,0,0,0.05)' 
   }}>
     <div onClick={() => onChangeTab('main')} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flex: 1, cursor: 'pointer', color: activeTab === 'main' ? '#e74c3c' : '#7f8c8d' }}>
       <motion.div animate={{ scale: activeTab === 'main' ? 1.2 : 1 }} style={{ fontSize: '1.6rem', marginBottom: '4px' }}>🎲</motion.div>
