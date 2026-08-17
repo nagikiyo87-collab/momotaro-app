@@ -4,8 +4,8 @@ import { QRCodeSVG } from 'qrcode.react';
 type Props = {
   onHostGame: (name: string) => Promise<string>;
   onJoinGame: (roomId: string, name: string) => Promise<void>;
-  savedRoomId: string | null;         // 🔑 追加
-  onResumeGame: () => void;           // 🔑 追加
+  savedRoomId: string | null;         
+  onResumeGame: () => void;           
 };
 
 type ScreenStep = 'tap_start' | 'home' | 'route_select' | 'room_setup';
@@ -20,7 +20,18 @@ export const TitlePage: React.FC<Props> = ({ onHostGame, onJoinGame, savedRoomId
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
+  // 🔑 追加：PWA（ホーム画面アプリ）として開かれているか判定するステート
+  const [isStandalone, setIsStandalone] = useState(true);
+
   useEffect(() => {
+    // 🔑 追加：Web（Safari等）かアプリ（PWA）かを判定するロジック
+    const checkStandalone = () => {
+      const isPWA = window.matchMedia('(display-mode: standalone)').matches || 
+                    ('standalone' in window.navigator && (window.navigator as any).standalone);
+      setIsStandalone(!!isPWA);
+    };
+    checkStandalone();
+
     const params = new URLSearchParams(window.location.search);
     const urlRoomId = params.get('roomId');
     const stepParam = params.get('step'); 
@@ -152,6 +163,16 @@ export const TitlePage: React.FC<Props> = ({ onHostGame, onJoinGame, savedRoomId
     <div style={containerStyle}>
       <h2>🚃 新宿 〜 高尾山口編</h2>
 
+      {/* 🔑 追加：Webブラウザで開いている場合の警告メッセージ */}
+      {!isStandalone && (
+        <div style={{ background: '#fff9c4', padding: '15px', borderRadius: '12px', border: '3px solid #fbc02d', marginBottom: '20px', textAlign: 'left' }}>
+          <p style={{ margin: '0 0 8px 0', color: '#f57f17', fontWeight: '900', fontSize: '1rem' }}>⚠️ ブラウザ版で開いています</p>
+          <p style={{ margin: '0', color: '#333', fontSize: '0.85rem', fontWeight: 'bold' }}>
+            最高の体験のために、ホーム画面に追加した「アプリ版」から起動するのがオススメです！
+          </p>
+        </div>
+      )}
+
       <div style={{ marginBottom: '20px', textAlign: 'left' }}>
         <label style={{ display: 'block', fontSize: '0.9rem', marginBottom: '5px', fontWeight: 'bold' }}>
           プレイヤー名（空欄なら自動設定）:
@@ -165,7 +186,7 @@ export const TitlePage: React.FC<Props> = ({ onHostGame, onJoinGame, savedRoomId
         />
       </div>
 
-      {error && <p style={{ color: 'red', fontSize: '0.9rem' }}>{error}</p>}
+      {error && <p style={{ color: 'red', fontSize: '0.9rem', fontWeight: 'bold' }}>{error}</p>}
 
       {mode === 'menu' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
@@ -208,6 +229,21 @@ export const TitlePage: React.FC<Props> = ({ onHostGame, onJoinGame, savedRoomId
 
       {mode === 'join' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+          
+          {/* 🔑 追加：QRで飛んできた人にコピーボタンを提供 */}
+          {inputRoomId && !isStandalone && (
+             <div style={{ marginBottom: '10px', padding: '10px', background: '#e3f2fd', borderRadius: '8px', border: '2px dashed #64b5f6' }}>
+               <p style={{ margin: '0 0 10px 0', fontSize: '0.85rem', fontWeight: 'bold', color: '#1976d2' }}>
+                 アプリ版で開く場合は、以下のIDをコピーしてアプリ側で入力してください！
+               </p>
+               <button 
+                 onClick={() => navigator.clipboard.writeText(inputRoomId)}
+                 style={{ padding: '8px', width: '100%', background: '#1976d2', color: '#fff', border: 'none', borderRadius: '6px', fontWeight: 'bold', cursor: 'pointer' }}>
+                 📋 ルームID ({inputRoomId}) をコピー
+               </button>
+             </div>
+          )}
+
           <input
             type="text"
             placeholder="6桁のルームIDを入力"
@@ -241,9 +277,12 @@ const inputStyle: React.CSSProperties = {
   width: '100%',
   padding: '10px',
   borderRadius: '6px',
-  border: '1px solid #ccc',
+  border: '2px solid #ccc',
   boxSizing: 'border-box',
-  fontSize: '1rem',
+  fontSize: '1.2rem',
+  fontWeight: 'bold',
+  textAlign: 'center',
+  letterSpacing: '2px'
 };
 
 const primaryBtnStyle: React.CSSProperties = {

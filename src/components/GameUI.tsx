@@ -221,27 +221,38 @@ export const GameMapView: React.FC<{ currentStationName: string; sharedPosition:
 );
 
 export const BottomNav: React.FC<{ activeTab: 'main' | 'map'; onChangeTab: (tab: 'main' | 'map') => void }> = ({ activeTab, onChangeTab }) => (
-  <div style={{ 
-    position: 'fixed', bottom: 0, left: 0, right: 0, // width:100% ではなく left/right:0 で画面幅に完全固定
-    backgroundColor: '#fff', borderTop: '3px solid #ecf0f1', 
-    display: 'flex', justifyContent: 'space-evenly', 
-    paddingTop: '10px',
-    /* 🔑 修正: 安全領域（ホームバー）＋ 基本の余白10px。非対応機種用には0pxを代入 */
-    paddingBottom: 'calc(10px + env(safe-area-inset-bottom, 0px))',
-    zIndex: 1000, boxShadow: '0 -4px 15px rgba(0,0,0,0.05)' 
-  }}>
-    <div onClick={() => onChangeTab('main')} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flex: 1, cursor: 'pointer', color: activeTab === 'main' ? '#e74c3c' : '#7f8c8d' }}>
-      <motion.div animate={{ scale: activeTab === 'main' ? 1.2 : 1 }} style={{ fontSize: '1.6rem', marginBottom: '4px' }}>🎲</motion.div>
-      <span style={{ fontWeight: activeTab === 'main' ? '800' : 'bold', fontSize: '0.8rem' }}>アクション</span>
-    </div>
-    <div style={{ width: '2px', background: '#ecf0f1', margin: '8px 0', borderRadius: '1px' }}></div>
-    <div onClick={() => onChangeTab('map')} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flex: 1, cursor: 'pointer', color: activeTab === 'map' ? '#27ae60' : '#7f8c8d' }}>
-      <motion.div animate={{ scale: activeTab === 'map' ? 1.2 : 1 }} style={{ fontSize: '1.6rem', marginBottom: '4px' }}>🗺️</motion.div>
-      <span style={{ fontWeight: activeTab === 'map' ? '800' : 'bold', fontSize: '0.8rem' }}>マップ</span>
-    </div>
-  </div>
-);
+  <>
+    {/* 🔑 最終手段：画面の一番下を強制的に白で塗りつぶす「土台」 */}
+    <div style={{
+      position: 'fixed', bottom: 0, left: 0, right: 0,
+      height: '50px', // 下部の隙間を絶対に埋める
+      backgroundColor: '#ffffff',
+      zIndex: 99998
+    }} />
 
+    {/* メニュー本体 */}
+    <div style={{ 
+      position: 'fixed', bottom: 0, left: 0, right: 0, 
+      backgroundColor: '#ffffff', 
+      borderTop: '3px solid #ecf0f1', 
+      display: 'flex', justifyContent: 'space-evenly', 
+      paddingTop: '10px',
+      paddingBottom: 'calc(10px + env(safe-area-inset-bottom, 0px))',
+      zIndex: 99999, 
+      boxShadow: '0 -4px 15px rgba(0,0,0,0.05)' 
+    }}>
+      <div onClick={() => onChangeTab('main')} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flex: 1, cursor: 'pointer', color: activeTab === 'main' ? '#e74c3c' : '#7f8c8d' }}>
+        <motion.div animate={{ scale: activeTab === 'main' ? 1.2 : 1 }} style={{ fontSize: '1.6rem', marginBottom: '4px' }}>🎲</motion.div>
+        <span style={{ fontWeight: activeTab === 'main' ? '800' : 'bold', fontSize: '0.8rem' }}>アクション</span>
+      </div>
+      <div style={{ width: '2px', background: '#ecf0f1', margin: '8px 0', borderRadius: '1px' }}></div>
+      <div onClick={() => onChangeTab('map')} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flex: 1, cursor: 'pointer', color: activeTab === 'map' ? '#27ae60' : '#7f8c8d' }}>
+        <motion.div animate={{ scale: activeTab === 'map' ? 1.2 : 1 }} style={{ fontSize: '1.6rem', marginBottom: '4px' }}>🗺️</motion.div>
+        <span style={{ fontWeight: activeTab === 'map' ? '800' : 'bold', fontSize: '0.8rem' }}>マップ</span>
+      </div>
+    </div>
+  </>
+);
 const MissionTimer: React.FC<{ roomId: string; stayTime: number; timerData: any }> = ({ roomId, stayTime, timerData }) => {
   const [displayTime, setDisplayTime] = useState(stayTime * 60);
 

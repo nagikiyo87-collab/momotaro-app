@@ -4,18 +4,27 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     
-    <!-- 🔑 モバイルフルスクリーン・拡大防止の設定 -->
+    <!-- 🔑 viewport-fit=cover でiPhoneの制限を解除し、画面の端まで描画させる -->
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
     
-    <!-- 🔑 PWA用の設定 (マニフェスト読み込み) -->
     <link rel="manifest" href="/manifest.json" />
-    <meta name="theme-color" content="#ff4757" />
+    <meta name="theme-color" content="#ffffff" /> <!-- ここも白に変更 -->
     
-    <!-- 🔑 iOS (iPhone / Safari) 用のアプリ起動設定 -->
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="リアル桃鉄" />
     <link rel="apple-touch-icon" href="/icons/pwa-192x192.png" />
+
+    <!-- 🔑 iPhoneのデフォルトのグレー背景を強制的に白に塗りつぶす -->
+    <style>
+      html, body {
+        background-color: #ffffff !important;
+        margin: 0;
+        padding: 0;
+        width: 100%;
+        height: 100%;
+      }
+    </style>
 
     <title>リアル桃鉄</title>
   </head>
