@@ -225,9 +225,12 @@ export const BottomNav: React.FC<{ activeTab: 'main' | 'map'; onChangeTab: (tab:
     position: 'fixed', bottom: 0, left: 0, width: '100%', 
     backgroundColor: '#fff', borderTop: '3px solid #ecf0f1', 
     display: 'flex', justifyContent: 'space-evenly', 
-    paddingTop: '10px', 
-    // 🔑 修正: 余白が広くなりすぎないよう「基本は10px、iPhoneのホームバーがある場合はその分だけ」に最適化
-    paddingBottom: 'max(10px, env(safe-area-inset-bottom))', 
+    paddingTop: '10px',
+    // 🔑 修正: iPhoneの黒い線（ホームバー）の分だけ正確に余白を取る
+    paddingBottom: 'env(safe-area-inset-bottom)',
+    // 🔑 追加: メニューのアイコン部分自体の高さを固定
+    height: '60px',
+    boxSizing: 'content-box', // padding分を高さに追加する設定
     zIndex: 100, boxShadow: '0 -4px 15px rgba(0,0,0,0.05)' 
   }}>
     <div onClick={() => onChangeTab('main')} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flex: 1, cursor: 'pointer', color: activeTab === 'main' ? '#e74c3c' : '#7f8c8d' }}>
