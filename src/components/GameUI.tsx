@@ -221,7 +221,15 @@ export const GameMapView: React.FC<{ currentStationName: string; sharedPosition:
 );
 
 export const BottomNav: React.FC<{ activeTab: 'main' | 'map'; onChangeTab: (tab: 'main' | 'map') => void }> = ({ activeTab, onChangeTab }) => (
-  <div style={{ position: 'fixed', bottom: 0, left: 0, width: '100%', backgroundColor: '#fff', borderTop: '3px solid #ecf0f1', display: 'flex', justifyContent: 'space-evenly', padding: '10px 0', zIndex: 100, boxShadow: '0 -4px 15px rgba(0,0,0,0.05)', paddingBottom: 'calc(10px + env(safe-area-inset-bottom))' }}>
+  <div style={{ 
+    position: 'fixed', bottom: 0, left: 0, width: '100%', 
+    backgroundColor: '#fff', borderTop: '3px solid #ecf0f1', 
+    display: 'flex', justifyContent: 'space-evenly', 
+    paddingTop: '10px', 
+    // 🔑 修正: 余白が広くなりすぎないよう「基本は10px、iPhoneのホームバーがある場合はその分だけ」に最適化
+    paddingBottom: 'max(10px, env(safe-area-inset-bottom))', 
+    zIndex: 100, boxShadow: '0 -4px 15px rgba(0,0,0,0.05)' 
+  }}>
     <div onClick={() => onChangeTab('main')} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flex: 1, cursor: 'pointer', color: activeTab === 'main' ? '#e74c3c' : '#7f8c8d' }}>
       <motion.div animate={{ scale: activeTab === 'main' ? 1.2 : 1 }} style={{ fontSize: '1.6rem', marginBottom: '4px' }}>🎲</motion.div>
       <span style={{ fontWeight: activeTab === 'main' ? '800' : 'bold', fontSize: '0.8rem' }}>アクション</span>
