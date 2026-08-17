@@ -110,7 +110,8 @@ export const useTurnActions = (
       const roll2 = Math.floor(Math.random() * 6) + 1;
       finalTotal = roll + roll2;
     }
-    await updateDoc(doc(db, 'rooms', roomId), { isRollingDice: true, pendingDiceTotal: finalTotal });
+    // 🔑 awaitを外してバックグラウンド送信に
+    updateDoc(doc(db, 'rooms', roomId), { isRollingDice: true, pendingDiceTotal: finalTotal }).catch(console.error);
   };
 
   const handleConfirmMove = async () => {
@@ -118,14 +119,18 @@ export const useTurnActions = (
     let itemMessage = '';
     if (activeItemEffect === 'i_dice_plus2') itemMessage = `🎲 ダイス+2カードの効果が適用されました！`;
     else if (activeItemEffect === 'i_dice_double') itemMessage = `🎲 サイコロ2個振りの効果が適用されました！`;
+    
+    // UIのアラート待機は残す
     if (itemMessage) await showAlert(itemMessage);
 
     let nextPosition = sharedPosition + pendingDiceTotal;
     if (nextPosition >= STATIONS.length - 1) nextPosition = STATIONS.length - 1;
     
-    await updateDoc(doc(db, 'rooms', roomId), { 
+    // 🔑 awaitを外して即時画面切り替え
+    updateDoc(doc(db, 'rooms', roomId), { 
       sharedPosition: nextPosition, lastDiceRoll: pendingDiceTotal, phase: 'roulette', isRollingDice: false, pendingDiceTotal: null
-    });
+    }).catch(console.error);
+    
     setActiveItemEffect(null);
   };
 
@@ -153,15 +158,19 @@ export const useTurnActions = (
     const newItems = [...(me?.items || [])];
     newItems.splice(index, 1);
     const updates: any = { [`players.${userId}.items`]: newItems, ...result.updates };
+    
     if (result.activeEffect) setActiveItemEffect(result.activeEffect);
     if (result.message) await showAlert(result.message);
-    await updateDoc(doc(db, 'rooms', roomId), updates);
+    
+    // 🔑 awaitを外す
+    updateDoc(doc(db, 'rooms', roomId), updates).catch(console.error);
   };
 
   const handleDiscardItem = async (index: number) => {
     const newItems = [...(me?.items || [])];
     newItems.splice(index, 1);
-    await updateDoc(doc(db, 'rooms', roomId), { [`players.${userId}.items`]: newItems });
+    // 🔑 awaitを外す
+    updateDoc(doc(db, 'rooms', roomId), { [`players.${userId}.items`]: newItems }).catch(console.error);
   };
 
   const handleSpinRoulette = async () => {
@@ -182,14 +191,17 @@ export const useTurnActions = (
       const otherMissions = targetMissions.filter(m => m.id !== myMissionObj.id);
       opponentMissionObj = otherMissions.length > 0 ? otherMissions[Math.floor(Math.random() * otherMissions.length)] : myMissionObj;
     }
-    await updateDoc(doc(db, 'rooms', roomId), {
+    
+    // 🔑 awaitを外す
+    updateDoc(doc(db, 'rooms', roomId), {
       isSpinningRoulette: true, pendingRouletteData: { time: timeResult, squareType: chosenType, myMissionId: myMissionObj.id, opMissionId: opponentMissionObj.id }
-    });
+    }).catch(console.error);
   };
 
   const handleConfirmRoulette = async () => {
     if (!pendingRouletteData || !opponentId) return;
-    await updateDoc(doc(db, 'rooms', roomId), {
+    // 🔑 awaitを外す
+    updateDoc(doc(db, 'rooms', roomId), {
       stayTime: pendingRouletteData.time, 
       squareType: pendingRouletteData.squareType, 
       currentMissions: { [userId]: pendingRouletteData.myMissionId, [opponentId]: pendingRouletteData.opMissionId }, 
@@ -197,30 +209,33 @@ export const useTurnActions = (
       destinations: {}, 
       isSpinningRoulette: false,
       pendingRouletteData: null
-    });
+    }).catch(console.error);
   };
 
   const handleSubmitDestination = async () => {
     if (isMyTurn) {
       if (!dest1) { await showAlert('⚠️ 1番目の目的地を入力してください！'); return; }
-      await updateDoc(doc(db, 'rooms', roomId), {
+      // 🔑 awaitを外す
+      updateDoc(doc(db, 'rooms', roomId), {
         'destinations.dest1': dest1,
         'destinations.dest3': dest3 || ''
-      });
+      }).catch(console.error);
     } else {
       if (!dest2) { await showAlert('⚠️ 2番目の目的地を入力してください！'); return; }
-      await updateDoc(doc(db, 'rooms', roomId), {
+      // 🔑 awaitを外す
+      updateDoc(doc(db, 'rooms', roomId), {
         'destinations.dest2': dest2
-      });
+      }).catch(console.error);
     }
   };
 
   const handleConfirmDestinations = async () => {
     const time = roomData.stayTime || 30;
-    await updateDoc(doc(db, 'rooms', roomId), {
+    // 🔑 awaitを外す
+    updateDoc(doc(db, 'rooms', roomId), {
       phase: 'mission',
       missionTimer: { isRunning: true, remainingSeconds: time * 60, endTime: Date.now() + time * 60 * 1000 }
-    });
+    }).catch(console.error);
     setDest1(''); setDest2(''); setDest3('');
   };
 
@@ -313,20 +328,24 @@ export const useTurnActions = (
     }
 
     alertMsg += `\n続けて「リアル出費の入力」に移動します！`;
+    
+    // UIアラート待機はそのまま
     await showAlert(alertMsg);
     setActiveItemEffect(null); 
 
-    await updateDoc(doc(db, 'rooms', roomId), {
+    // 🔑 awaitを外す
+    updateDoc(doc(db, 'rooms', roomId), {
       [`players.${userId}.money`]: myResult.newMoney, [`players.${userId}.properties`]: myResult.remainingProperties, [`players.${userId}.items`]: myNewItems,
       [`players.${opponentId}.money`]: opResult.newMoney, [`players.${opponentId}.properties`]: opResult.remainingProperties, [`players.${opponentId}.items`]: opponentNewItems,
       bombyPossessedId: newBombyId, bombyType: nextBombyType, phase: 'spending', spendings: {} 
-    });
+    }).catch(console.error);
   };
 
   const handleSubmitSpending = async () => {
     if (spentInput === '') { await showAlert('⚠️ 使ってない場合は「0」を入力してください！'); return; }
     const amount = Number(spentInput);
-    await updateDoc(doc(db, 'rooms', roomId), { [`spendings.${userId}`]: amount });
+    // 🔑 awaitを外す
+    updateDoc(doc(db, 'rooms', roomId), { [`spendings.${userId}`]: amount }).catch(console.error);
   };
 
   const handleFinishSpending = async () => {
@@ -344,11 +363,12 @@ export const useTurnActions = (
     msg += `\n続けて「物件のシークレット入札」に移動します！`;
     await showAlert(msg);
 
-    await updateDoc(doc(db, 'rooms', roomId), {
+    // 🔑 awaitを外す
+    updateDoc(doc(db, 'rooms', roomId), {
       [`players.${userId}.money`]: myResult.newMoney, [`players.${userId}.properties`]: myResult.remainingProperties,
       [`players.${opponentId}.money`]: opResult.newMoney, [`players.${opponentId}.properties`]: opResult.remainingProperties,
       phase: 'bidding', bids: {}
-    });
+    }).catch(console.error);
     setSpentInput('');
   };
 
@@ -370,7 +390,9 @@ export const useTurnActions = (
         }
       }
     } else { finalAmount = 0; }
-    await updateDoc(doc(db, 'rooms', roomId), { [`bids.${userId}`]: { propertyId: finalPropertyId, amount: finalAmount } });
+    
+    // 🔑 awaitを外す
+    updateDoc(doc(db, 'rooms', roomId), { [`bids.${userId}`]: { propertyId: finalPropertyId, amount: finalAmount } }).catch(console.error);
   };
 
   const handleRevealBids = async (myBid: any, opponentBid: any) => {
@@ -434,11 +456,12 @@ export const useTurnActions = (
 
     const nextPhase = isGoal ? 'result' : (roomData.bombyPossessedId ? 'bomby' : 'dice');
 
-    await updateDoc(doc(db, 'rooms', roomId), {
+    // 🔑 awaitを外す
+    updateDoc(doc(db, 'rooms', roomId), {
       [`players.${userId}.properties`]: myProperties, [`players.${opponentId}.properties`]: opponentProperties,
       [`players.${userId}.money`]: myNewMoney, [`players.${opponentId}.money`]: opponentNewMoney,
       year: nextYear, season: SEASONS[nextSeasonIndex], phase: nextPhase, currentTurn: opponentId 
-    });
+    }).catch(console.error);
   };
 
   const handleBombyAction = async () => {
@@ -481,7 +504,6 @@ export const useTurnActions = (
         moneyChange = -1000; 
         message = `【😈 貧乏神の悪行】\n「お金を落としてきたのねん！」\n所持金が -1000円 されました。`; 
       } else if (act < 0.66) { 
-        // 🔑 修正：ジュース奢りの時は先にセリフを出して、その後に入力させる
         await showAlert(`【😈 貧乏神の悪行】\n「のどが渇いたのねん！」\n現実で相手に「ジュースかお菓子」を奢ってください！`);
         
         const input = window.prompt('相手に奢る（または奢った）ジュースやお菓子の金額（円）を半角数字で入力してください。', '150');
@@ -498,10 +520,11 @@ export const useTurnActions = (
     
     await showAlert(message);
 
-    await updateDoc(doc(db, 'rooms', roomId), {
+    // 🔑 awaitを外す
+    updateDoc(doc(db, 'rooms', roomId), {
       [`players.${userId}.money`]: myResult.newMoney, [`players.${userId}.properties`]: myResult.remainingProperties,
       bombyType: newType, phase: 'dice'
-    });
+    }).catch(console.error);
   };
 
   return {
