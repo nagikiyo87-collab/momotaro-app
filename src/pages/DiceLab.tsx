@@ -17,6 +17,9 @@ const DISPLAYS: { id: DiceMode; label: string }[] = [
   { id: 'tray', label: '盤の上' },
 ];
 
+// 画面に出す版番号。iPhone で最新版が表示されているか確かめるため、見た目を変えたら上げる
+const LAB_VERSION = 'v6 白黒';
+
 const roll = () => Math.floor(Math.random() * 6) + 1;
 
 const chip = (active: boolean): React.CSSProperties => ({
@@ -138,7 +141,9 @@ export const DiceLab = () => {
         <a href="/" style={{ color: '#ff4757', fontWeight: 800, textDecoration: 'none' }}>
           ← タイトル
         </a>
-        <h1 style={{ margin: 0, fontSize: '1.1rem', color: '#2f3542', fontWeight: 900 }}>🎲 サイコロ試作</h1>
+        <h1 style={{ margin: 0, fontSize: '1.1rem', color: '#2f3542', fontWeight: 900 }}>
+          🎲 サイコロ試作 <span style={{ fontSize: '0.7rem', color: '#a4b0be' }}>{LAB_VERSION}</span>
+        </h1>
         <button
           onClick={() => setSound((s) => !s)}
           style={{ border: 'none', background: 'none', fontSize: '1.3rem', cursor: 'pointer' }}
@@ -298,7 +303,7 @@ export const DiceLab = () => {
             visibility: overlayOpen ? 'visible' : 'hidden',
             opacity: overlayOpen ? 1 : 0,
             transition: 'opacity 0.2s',
-            background: 'radial-gradient(ellipse at 50% 42%, rgba(60,30,80,0.82) 0%, rgba(12,6,24,0.94) 70%)',
+            background: 'radial-gradient(ellipse at 50% 35%, rgba(62,128,58,0.97) 0%, rgba(22,64,36,0.98) 80%)',
           }}
         >
           <Dice3D key="stage" mode="stage" values={values} rollId={rollId} sound={sound} onLanded={onLanded} />

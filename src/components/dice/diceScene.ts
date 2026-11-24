@@ -48,32 +48,27 @@ const drawFace = (value: number) => {
   const c = color.getContext('2d')!;
   const b = bump.getContext('2d')!;
 
-  // 地の色：わずかにムラのある象牙色
+  // 地の色：真っ白（ほんのわずかに縁を落とす）
   const g = c.createRadialGradient(TEX * 0.4, TEX * 0.35, TEX * 0.05, TEX / 2, TEX / 2, TEX * 0.75);
-  g.addColorStop(0, '#fbf8f1');
-  g.addColorStop(1, '#ece5d6');
+  g.addColorStop(0, '#ffffff');
+  g.addColorStop(1, '#f1f1f1');
   c.fillStyle = g;
   c.fillRect(0, 0, TEX, TEX);
   b.fillStyle = '#ffffff';
   b.fillRect(0, 0, TEX, TEX);
 
   const isOne = value === 1;
-  const r = isOne ? TEX * 0.17 : TEX * 0.095;
+  const r = isOne ? TEX * 0.12 : TEX * 0.095; // 1 の目だけ少し大きい黒丸
   for (const cell of PIPS[value]) {
     const cx = TEX * (0.24 + (cell % 3) * 0.26);
     const cy = TEX * (0.24 + Math.floor(cell / 3) * 0.26);
 
     // 色：くぼみの奥ほど暗く、上側の縁に少し光
     const pg = c.createRadialGradient(cx - r * 0.25, cy - r * 0.3, r * 0.1, cx, cy, r);
-    if (isOne) {
-      pg.addColorStop(0, '#e8323f');
-      pg.addColorStop(0.75, '#b5141f');
-      pg.addColorStop(1, '#7d0b14');
-    } else {
-      pg.addColorStop(0, '#2b2b33');
-      pg.addColorStop(0.8, '#121217');
-      pg.addColorStop(1, '#3a3a40');
-    }
+    // 白と黒のサイコロ（1 の目も黒）
+    pg.addColorStop(0, '#2a2a2e');
+    pg.addColorStop(0.8, '#0c0c0e');
+    pg.addColorStop(1, '#38383c');
     c.fillStyle = pg;
     c.beginPath();
     c.arc(cx, cy, r, 0, Math.PI * 2);
@@ -191,7 +186,7 @@ export class DiceScene {
     this.renderer.toneMapping = THREE.NeutralToneMapping;
     this.renderer.toneMappingExposure = 1.0;
     this.renderer.shadowMap.enabled = true;
-    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    this.renderer.shadowMap.type = THREE.PCFShadowMap;
     this.renderer.domElement.style.display = 'block';
     this.renderer.domElement.style.width = '100%';
     this.renderer.domElement.style.height = '100%';
@@ -201,14 +196,14 @@ export class DiceScene {
     const pmrem = new THREE.PMREMGenerator(this.renderer);
     const envTex = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
     this.scene.environment = envTex;
-    this.scene.environmentIntensity = 0.2; // 強すぎると全部の面が同じ明るさになり平たく見える
+    this.scene.environmentIntensity = 0.35;
     pmrem.dispose();
     this.disposables.push(envTex);
 
     // 照明：左上手前から強い主光（影を落とす）＋右から弱い補助光。
     // 上・左・右の面の明るさに差をつけると、立体に見える
-    const sun = new THREE.DirectionalLight(0xfff2e0, 3.4);
-    sun.position.set(-4, 7, 5);
+    const sun = new THREE.DirectionalLight(0xffffff, 2.2);
+    sun.position.set(-2.5, 8, 3);
     sun.castShadow = true;
     sun.shadow.mapSize.set(1024, 1024);
     sun.shadow.camera.left = -6;
@@ -218,10 +213,10 @@ export class DiceScene {
     sun.shadow.radius = 4;
     sun.shadow.bias = -0.0008;
     this.scene.add(sun);
-    const fill = new THREE.DirectionalLight(0xd6e4ff, 0.45);
+    const fill = new THREE.DirectionalLight(0xeef3ff, 0.5);
     fill.position.set(5, 2.5, 1);
     this.scene.add(fill);
-    this.scene.add(new THREE.HemisphereLight(0xffffff, 0x1a1a26, 0.15));
+    this.scene.add(new THREE.HemisphereLight(0xffffff, 0x8a8a8a, 0.9));
 
     // 床：盤モードはフェルト、ステージモードは床を描かず影だけを落とす（下の画面が透けて見える）
     let floorMat: THREE.Material;
@@ -246,9 +241,9 @@ export class DiceScene {
         map,
         bumpMap,
         bumpScale: 3,
-        roughness: 0.3,
-        clearcoat: 1,
-        clearcoatRoughness: 0.1,
+        roughness: 0.35,
+        clearcoat: 0.4,
+        clearcoatRoughness: 0.2,
       });
     });
     this.disposables.push(this.geometry, ...this.materials);
@@ -300,8 +295,8 @@ export class DiceScene {
     const t = Math.tan(THREE.MathUtils.degToRad(this.camera.fov / 2));
     const width = this.count > 1 ? 4.6 : 3.4;
     const dist = Math.max(width / (2 * t * this.camera.aspect), 3.4 / (2 * t));
-    // 見下ろす角度は約 40°（真上に近いと上の面しか見えず平たく見える）
-    const dir = new THREE.Vector3(0, 0.64, 0.77).normalize();
+    // 見下ろす角度は約 35°（真上に近いと上の面しか見えず平たく見える）
+    const dir = new THREE.Vector3(0, 0.57, 0.82).normalize();
     this.camera.position.copy(dir.multiplyScalar(dist));
     this.camera.lookAt(0, 0, 0);
   }
@@ -371,7 +366,7 @@ export class DiceScene {
     values.forEach((v, i) => {
       const { group, mesh } = this.dice[i];
       group.position.set((i - (values.length - 1) / 2) * gap, DIE / 2, this.mode === 'tray' ? 0.2 : 0);
-      group.quaternion.setFromAxisAngle(UP, (i === 0 ? 1 : -1) * 0.6);
+      group.quaternion.setFromAxisAngle(UP, Math.PI / 4 + (i === 0 ? 0.08 : -0.08));
       mesh.quaternion.setFromUnitVectors(VALUE_NORMAL[v], UP);
       this.syncContact(i);
     });
@@ -380,7 +375,7 @@ export class DiceScene {
 
   /**
    * 止まったサイコロがカメラに真正面を向くと、正方形 1 枚に見えて平たい。
-   * 転がり全体を、止まった位置を中心に水平に少し回して、斜め（25〜40°）を向いて止まるようにする。
+   * 転がり全体を、止まった位置を中心に水平に少し回して、角をこちらに向けた斜め 45° 前後で止まるようにする。
    * 全部のサイコロを同じだけ回すので、サイコロ同士のぶつかり方は崩れない
    */
   private turnToDiagonal(rec: Recording, count: number, rand: () => number) {
@@ -391,7 +386,8 @@ export class DiceScene {
     const side = LOCAL_AXES.find((a) => Math.abs(a.dot(top)) < 0.5)!.clone().applyQuaternion(q0);
     const quarter = Math.PI / 2;
     const phi = (((Math.atan2(side.x, side.z) % quarter) + quarter) % quarter); // 0〜90°
-    const target = THREE.MathUtils.degToRad(25 + rand() * 15) * (rand() < 0.5 ? 1 : -1) + (rand() < 0.5 ? 0 : quarter);
+    // 角をこちらに向けた 45° 前後（左右の側面が同じくらい見える）
+    const target = THREE.MathUtils.degToRad(45 + (rand() - 0.5) * 10);
     let delta = target - phi;
     delta = ((((delta + quarter / 2) % quarter) + quarter) % quarter) - quarter / 2; // -45〜45° に収める
 
