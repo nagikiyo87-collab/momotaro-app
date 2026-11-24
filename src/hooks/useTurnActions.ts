@@ -86,7 +86,7 @@ export const useTurnActions = (
     if (!opponentId || isRollingDice || pendingDiceTotal !== null) return;
     const roll = () => Math.floor(Math.random() * 6) + 1;
     const values = activeItemEffect === 'i_dice_double' ? [roll(), roll()] : [roll()];
-    // ※仕様書では「ダイス+2」はサイコロ勝負専用。今は v1 の動き（移動の出目に +2）のまま
+    // 「ダイス+2カード」は振る前に使い、移動の出目に +2 する（2026-11-24 ユーザー確認）
     const bonus = activeItemEffect === 'i_dice_plus2' ? 2 : 0;
     const finalTotal = values.reduce((a, b) => a + b, 0) + bonus;
     // 🔑 awaitを外してバックグラウンド送信に。
