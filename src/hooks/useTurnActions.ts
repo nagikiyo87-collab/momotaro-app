@@ -27,10 +27,14 @@ export const useTurnActions = (
   const isMyTurn = roomData?.currentTurn === userId; 
   const isRollingDice = roomData?.isRollingDice || false;
   const pendingDiceTotal = roomData?.pendingDiceTotal ?? null;
+  // 3D サイコロの演出用（振った側が書き、2 台とも同じ演出を再生する）
+  const pendingDiceValues: number[] | null = roomData?.pendingDiceValues ?? null;
+  const pendingDiceBonus: number = roomData?.pendingDiceBonus ?? 0;
+  const diceRollKey: number | null = roomData?.diceRollKey ?? null;
+  const diceSeed: number | undefined = roomData?.diceSeed ?? undefined;
   const isSpinningRoulette = roomData?.isSpinningRoulette || false;
   const pendingRouletteData = roomData?.pendingRouletteData ?? null;
 
-  const [displayDice, setDisplayDice] = useState<number | null>(null);
   const [displayRoulette, setDisplayRoulette] = useState<number | null>(null);
 
   const sharedPosition = roomData?.sharedPosition || 0;
@@ -38,30 +42,7 @@ export const useTurnActions = (
   const currentSeason = roomData?.season || 'spring';
   const bombyPossessedId = roomData?.bombyPossessedId;
 
-  const [isAnimatingDice, setIsAnimatingDice] = useState(false);
   const [isAnimatingRoulette, setIsAnimatingRoulette] = useState(false);
-
-  useEffect(() => {
-    let interval: number;
-    if (isRollingDice && pendingDiceTotal !== null) {
-      setIsAnimatingDice(true);
-      let count = 0;
-      const maxCount = 20;
-      interval = window.setInterval(() => {
-        setDisplayDice(Math.floor(Math.random() * 6) + 1);
-        count++;
-        if (count >= maxCount) {
-          window.clearInterval(interval);
-          setDisplayDice(pendingDiceTotal);
-          setIsAnimatingDice(false);
-        }
-      }, 50);
-    } else if (!isRollingDice && pendingDiceTotal === null) {
-      setDisplayDice(null);
-      setIsAnimatingDice(false);
-    }
-    return () => window.clearInterval(interval);
-  }, [isRollingDice, pendingDiceTotal]);
 
   useEffect(() => {
     let interval: number;
@@ -103,15 +84,21 @@ export const useTurnActions = (
 
   const handleRollDice = async () => {
     if (!opponentId || isRollingDice || pendingDiceTotal !== null) return;
-    let roll = Math.floor(Math.random() * 6) + 1;
-    let finalTotal = roll;
-    if (activeItemEffect === 'i_dice_plus2') finalTotal = roll + 2; 
-    else if (activeItemEffect === 'i_dice_double') {
-      const roll2 = Math.floor(Math.random() * 6) + 1;
-      finalTotal = roll + roll2;
-    }
-    // 🔑 awaitを外してバックグラウンド送信に
-    updateDoc(doc(db, 'rooms', roomId), { isRollingDice: true, pendingDiceTotal: finalTotal }).catch(console.error);
+    const roll = () => Math.floor(Math.random() * 6) + 1;
+    const values = activeItemEffect === 'i_dice_double' ? [roll(), roll()] : [roll()];
+    // ※仕様書では「ダイス+2」はサイコロ勝負専用。今は v1 の動き（移動の出目に +2）のまま
+    const bonus = activeItemEffect === 'i_dice_plus2' ? 2 : 0;
+    const finalTotal = values.reduce((a, b) => a + b, 0) + bonus;
+    // 🔑 awaitを外してバックグラウンド送信に。
+    // diceRollKey が変わると 2 台とも演出を再生し、diceSeed で転がり方もそろえる
+    updateDoc(doc(db, 'rooms', roomId), {
+      isRollingDice: true,
+      pendingDiceTotal: finalTotal,
+      pendingDiceValues: values,
+      pendingDiceBonus: bonus,
+      diceRollKey: Date.now(),
+      diceSeed: Math.floor(Math.random() * 2 ** 31),
+    }).catch(console.error);
   };
 
   const handleConfirmMove = async () => {
@@ -128,7 +115,8 @@ export const useTurnActions = (
     
     // 🔑 awaitを外して即時画面切り替え
     updateDoc(doc(db, 'rooms', roomId), { 
-      sharedPosition: nextPosition, lastDiceRoll: pendingDiceTotal, phase: 'roulette', isRollingDice: false, pendingDiceTotal: null
+      sharedPosition: nextPosition, lastDiceRoll: pendingDiceTotal, phase: 'roulette', isRollingDice: false, pendingDiceTotal: null,
+      pendingDiceValues: null, pendingDiceBonus: 0,
     }).catch(console.error);
     
     setActiveItemEffect(null);
@@ -528,10 +516,10 @@ export const useTurnActions = (
   };
 
   return {
-    diceResult: displayDice, rouletteResult: displayRoulette, 
+    rouletteResult: displayRoulette,
     selectedPropertyId, setSelectedPropertyId, bidAmount, setBidAmount, activeItemEffect, setActiveItemEffect,
-    isRollingDice, isSpinningRoulette, isAnimatingDice, isAnimatingRoulette,
-    pendingDiceTotal, pendingRouletteData,
+    isRollingDice, isSpinningRoulette, isAnimatingRoulette,
+    pendingDiceTotal, pendingDiceValues, pendingDiceBonus, diceRollKey, diceSeed, pendingRouletteData,
     spentInput, setSpentInput,
     dest1, setDest1, dest2, setDest2, dest3, setDest3, 
     handleRollDice, handleConfirmMove, handleUseItem, handleDiscardItem, 

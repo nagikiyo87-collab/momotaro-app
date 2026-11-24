@@ -2,6 +2,8 @@ import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Dice3D } from '../components/dice/Dice3D';
 import type { DiceMode } from '../components/dice/diceScene';
+import { DiceResult } from '../components/dice/DiceResult';
+import { STAGE_BACKGROUND, diceFormula } from '../components/dice/diceUtils';
 
 // サイコロのお試し画面（URL に ?lab=dice を付けて開く）
 type Count = 'single' | 'double' | 'plus2';
@@ -36,43 +38,6 @@ const chip = (active: boolean): React.CSSProperties => ({
 });
 
 const label: React.CSSProperties = { fontSize: '0.8rem', fontWeight: 700, color: '#747d8c', marginBottom: 6 };
-
-/** 着地後の出目表示（ステージ用の大きな数字） */
-const BigResult = ({ total, formula, rollId }: { total: number; formula: string | null; rollId: number }) => (
-  <motion.div
-    key={rollId}
-    initial={{ opacity: 0, scale: 0.3, y: 30 }}
-    animate={{ opacity: 1, scale: 1, y: 0 }}
-    exit={{ opacity: 0 }}
-    transition={{ type: 'spring', stiffness: 420, damping: 14 }}
-    style={{ position: 'absolute', left: 0, right: 0, bottom: '13%', textAlign: 'center', pointerEvents: 'none' }}
-  >
-    {formula && (
-      <div style={{ color: '#fff', fontSize: '1.2rem', fontWeight: 800, textShadow: '0 2px 6px rgba(0,0,0,0.6)' }}>
-        {formula}
-      </div>
-    )}
-    <div
-      style={{
-        fontSize: '6.5rem',
-        lineHeight: 1,
-        fontWeight: 900,
-        color: '#ffd23f',
-        WebkitTextStroke: '4px #8a2c00',
-        paintOrder: 'stroke fill',
-        textShadow: '0 6px 0 #8a2c00, 0 12px 24px rgba(0,0,0,0.5)',
-      }}
-    >
-      {total}
-    </div>
-    <div style={{ color: '#fff', fontSize: '1.4rem', fontWeight: 900, textShadow: '0 2px 6px rgba(0,0,0,0.7)' }}>
-      マス進む！
-    </div>
-    <div style={{ marginTop: 18, color: 'rgba(255,255,255,0.75)', fontSize: '0.85rem', fontWeight: 700 }}>
-      タップで閉じる
-    </div>
-  </motion.div>
-);
 
 export const DiceLab = () => {
   const [display, setDisplay] = useState<DiceMode>('stage');
@@ -115,8 +80,7 @@ export const DiceLab = () => {
 
   const sum = values.reduce((a, b) => a + b, 0);
   const total = sum + (count === 'plus2' ? 2 : 0);
-  const formula =
-    count === 'double' ? `${values[0]} ＋ ${values[1]}` : count === 'plus2' ? `${values[0]} ＋ 2（カード）` : null;
+  const formula = diceFormula(values, count === 'plus2' ? 2 : 0);
 
   const onLanded = () => {
     setRolling(false);
@@ -303,12 +267,12 @@ export const DiceLab = () => {
             visibility: overlayOpen ? 'visible' : 'hidden',
             opacity: overlayOpen ? 1 : 0,
             transition: 'opacity 0.2s',
-            background: 'radial-gradient(ellipse at 50% 35%, rgba(62,128,58,0.97) 0%, rgba(22,64,36,0.98) 80%)',
+            background: STAGE_BACKGROUND,
           }}
         >
           <Dice3D key="stage" mode="stage" values={values} rollId={rollId} sound={sound} onLanded={onLanded} />
           <AnimatePresence>
-            {landed && overlayOpen && <BigResult total={total} formula={formula} rollId={rollId} />}
+            {landed && overlayOpen && <DiceResult total={total} formula={formula} rollId={rollId} />}
           </AnimatePresence>
         </div>
       )}

@@ -1,14 +1,17 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, lazy, Suspense } from 'react';
 import { useGameSync } from '../hooks/useGameSync';
 import { useTurnActions } from '../hooks/useTurnActions';
 import { STATIONS, STATION_PROPERTIES, MISSIONS, ITEMS } from '../data/gameData'; 
 import { RuleModal } from '../components/RuleModal';
-import { GameHeader, PlayerCards, GameMapView, BottomNav, AnimatedDice, AnimatedRoulette, SeasonalBackground, DestinationPhaseUI, MissionPhaseUI, SpendingPhaseUI, BiddingPhaseUI, ResultPhaseUI } from '../components/GameUI';
+import { GameHeader, PlayerCards, GameMapView, BottomNav, AnimatedRoulette, SeasonalBackground, DestinationPhaseUI, MissionPhaseUI, SpendingPhaseUI, BiddingPhaseUI, ResultPhaseUI } from '../components/GameUI';
 import { motion, AnimatePresence } from 'framer-motion';
 import { doc, updateDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { QRCodeSVG } from 'qrcode.react'; 
 import '../styles/index.css'; 
+
+// 3D サイコロ（three.js を含むので、ゲーム画面に入ってから別に読み込む。タイトル画面は軽いまま）
+const DiceRollOverlay = lazy(() => import('../components/dice/DiceRollOverlay'));
 
 type Props = { roomId: string; userId: string; };
 
@@ -255,11 +258,13 @@ export const GamePage: React.FC<Props> = ({ roomId, userId }) => {
                         </div>
                       )}
 
-                      <div style={{ marginBottom: '20px' }}>
-                        <AnimatedDice 
-                          isRolling={actions.isAnimatingDice} 
-                          result={actions.diceResult} 
-                        />
+                      {/* 出目の表示（転がる演出は画面いっぱいの DiceRollOverlay で行う） */}
+                      <div style={{ marginBottom: '20px', fontSize: '3rem', fontWeight: 900, color: '#2f3542', minHeight: '80px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+                        {actions.pendingDiceTotal !== null ? (
+                          <>🎲 {actions.pendingDiceTotal}<span style={{ fontSize: '1.1rem' }}>マス</span></>
+                        ) : (
+                          <span style={{ fontSize: '4rem' }}>🎲</span>
+                        )}
                       </div>
 
                       {actions.pendingDiceTotal !== null ? (
@@ -387,6 +392,14 @@ export const GamePage: React.FC<Props> = ({ roomId, userId }) => {
       )}
 
       <RuleModal isOpen={isRuleOpen} onClose={() => setIsRuleOpen(false)} onAdjustMoney={handleAdjustMoney} />
+      <Suspense fallback={null}>
+        <DiceRollOverlay
+          rollKey={actions.diceRollKey}
+          values={actions.pendingDiceValues}
+          bonus={actions.pendingDiceBonus}
+          seed={actions.diceSeed}
+        />
+      </Suspense>
     </div>
   );
 };

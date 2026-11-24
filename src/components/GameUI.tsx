@@ -761,40 +761,6 @@ export const SeasonalBackground: React.FC<{ season: string }> = ({ season }) => 
   );
 };
 
-export const AnimatedDice: React.FC<{ isRolling: boolean; result: number | null }> = ({ isRolling, result }) => {
-  return (
-    <div style={{ perspective: '800px', display: 'flex', justifyContent: 'center', alignItems: 'center', height: '120px' }}>
-      <motion.div
-        animate={
-          isRolling
-            ? { rotateX: [0, 360, 720], rotateY: [0, 360, 720], scale: [1, 1.2, 1] }
-            : { rotateX: 0, rotateY: 0, scale: 1 }
-        }
-        transition={
-          isRolling
-            ? { duration: 0.5, repeat: Infinity, ease: 'linear' }
-            : { type: 'spring', stiffness: 200, damping: 10 }
-        }
-        style={{
-          width: '80px', height: '80px',
-          background: isRolling ? 'linear-gradient(135deg, #ff9a9e 0%, #fecfef 99%, #fecfef 100%)' : '#ff4757',
-          borderRadius: '16px', display: 'flex', justifyContent: 'center', alignItems: 'center',
-          boxShadow: isRolling ? '0 10px 30px rgba(255, 71, 87, 0.5)' : '0 8px 0 #c0392b',
-          border: '4px solid #fff',
-        }}
-      >
-        {!isRolling && result !== null ? (
-          <motion.span initial={{ opacity: 0, scale: 0.5 }} animate={{ opacity: 1, scale: 1 }} style={{ fontSize: '3rem', fontWeight: '900', color: '#fff' }}>
-            {result}
-          </motion.span>
-        ) : (
-          <span style={{ fontSize: '3rem', color: 'rgba(255,255,255,0.5)' }}>?</span>
-        )}
-      </motion.div>
-    </div>
-  );
-};
-
 export const AnimatedRoulette: React.FC<{ isSpinning: boolean; result: number | null }> = ({ isSpinning, result }) => {
   return (
     <div style={{ height: '100px', overflow: 'hidden', display: 'flex', justifyContent: 'center', alignItems: 'center', background: '#f8f9fa', borderRadius: '16px', border: '4px solid #ecf0f1', position: 'relative' }}>
