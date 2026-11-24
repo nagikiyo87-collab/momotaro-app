@@ -40,6 +40,7 @@ export const DiceLab = () => {
     setMode(m);
     setValues(m === 'double' ? [values[0] ?? 1, 1] : [values[0] ?? 1]);
     setLanded(false);
+    setRollId(0); // 投げていない状態に戻して、新しい個数で置き直す
   };
 
   const handleRoll = () => {
@@ -113,11 +114,20 @@ export const DiceLab = () => {
           <Dice3D
             values={values}
             rollId={rollId}
-            size={mode === 'double' ? 72 : 88}
             sound={sound}
             onLanded={() => {
               setRolling(false);
               setLanded(true);
+            }}
+          />
+          {/* 盤の縁の陰（奥行きを出す） */}
+          <div
+            style={{
+              position: 'absolute',
+              inset: 0,
+              pointerEvents: 'none',
+              boxShadow: 'inset 0 6px 18px rgba(0,0,0,0.5)',
+              background: 'radial-gradient(ellipse at 50% 45%, rgba(0,0,0,0) 55%, rgba(0,0,0,0.35) 100%)',
             }}
           />
           <AnimatePresence>
