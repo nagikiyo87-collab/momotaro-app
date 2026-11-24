@@ -169,10 +169,10 @@ const FPS = 60;
 export class DiceScene {
   private renderer: THREE.WebGLRenderer;
   private scene = new THREE.Scene();
-  private camera = new THREE.PerspectiveCamera(32, 1, 0.1, 100);
-  private geometry = new RoundedBoxGeometry(DIE, DIE, DIE, 5, 0.13);
+  private camera = new THREE.PerspectiveCamera(36, 1, 0.1, 100);
+  private geometry = new RoundedBoxGeometry(DIE, DIE, DIE, 6, 0.15);
   private materials: THREE.MeshPhysicalMaterial[];
-  private dice: { group: THREE.Group; mesh: THREE.Mesh }[] = [];
+  private dice: { group: THREE.Group; mesh: THREE.Mesh; contact: THREE.Mesh }[] = [];
   private disposables: { dispose: () => void }[] = [];
   private raf = 0;
   private resizeObserver: ResizeObserver;
@@ -188,8 +188,8 @@ export class DiceScene {
     this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
-    this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    this.renderer.toneMappingExposure = 1.05;
+    this.renderer.toneMapping = THREE.NeutralToneMapping;
+    this.renderer.toneMappingExposure = 1.0;
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     this.renderer.domElement.style.display = 'block';
@@ -201,13 +201,14 @@ export class DiceScene {
     const pmrem = new THREE.PMREMGenerator(this.renderer);
     const envTex = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
     this.scene.environment = envTex;
-    this.scene.environmentIntensity = 0.55;
+    this.scene.environmentIntensity = 0.2; // 強すぎると全部の面が同じ明るさになり平たく見える
     pmrem.dispose();
     this.disposables.push(envTex);
 
-    // 照明：左上から太陽のような光（影を落とす）＋全体の柔らかい光
-    const sun = new THREE.DirectionalLight(0xfff4e0, 2.4);
-    sun.position.set(-3.5, 9, 4);
+    // 照明：左上手前から強い主光（影を落とす）＋右から弱い補助光。
+    // 上・左・右の面の明るさに差をつけると、立体に見える
+    const sun = new THREE.DirectionalLight(0xfff2e0, 3.4);
+    sun.position.set(-4, 7, 5);
     sun.castShadow = true;
     sun.shadow.mapSize.set(1024, 1024);
     sun.shadow.camera.left = -6;
@@ -217,7 +218,10 @@ export class DiceScene {
     sun.shadow.radius = 4;
     sun.shadow.bias = -0.0008;
     this.scene.add(sun);
-    this.scene.add(new THREE.HemisphereLight(0xffffff, 0x1a3a26, 0.35));
+    const fill = new THREE.DirectionalLight(0xd6e4ff, 0.45);
+    fill.position.set(5, 2.5, 1);
+    this.scene.add(fill);
+    this.scene.add(new THREE.HemisphereLight(0xffffff, 0x1a1a26, 0.15));
 
     // 床：盤モードはフェルト、ステージモードは床を描かず影だけを落とす（下の画面が透けて見える）
     let floorMat: THREE.Material;
@@ -226,7 +230,7 @@ export class DiceScene {
       floorMat = new THREE.MeshStandardMaterial({ color: 0x155a35, roughness: 0.95, bumpMap: felt, bumpScale: 0.6 });
       this.disposables.push(felt);
     } else {
-      floorMat = new THREE.ShadowMaterial({ opacity: 0.4 });
+      floorMat = new THREE.ShadowMaterial({ opacity: 0.55 });
     }
     const floor = new THREE.Mesh(new THREE.PlaneGeometry(40, 40), floorMat);
     floor.rotation.x = -Math.PI / 2;
@@ -241,10 +245,10 @@ export class DiceScene {
       return new THREE.MeshPhysicalMaterial({
         map,
         bumpMap,
-        bumpScale: 2.2,
-        roughness: 0.32,
-        clearcoat: 0.7,
-        clearcoatRoughness: 0.18,
+        bumpScale: 3,
+        roughness: 0.3,
+        clearcoat: 1,
+        clearcoatRoughness: 0.1,
       });
     });
     this.disposables.push(this.geometry, ...this.materials);
@@ -296,13 +300,46 @@ export class DiceScene {
     const t = Math.tan(THREE.MathUtils.degToRad(this.camera.fov / 2));
     const width = this.count > 1 ? 4.6 : 3.4;
     const dist = Math.max(width / (2 * t * this.camera.aspect), 3.4 / (2 * t));
-    const dir = new THREE.Vector3(0, 0.86, 0.51).normalize();
+    // 見下ろす角度は約 40°（真上に近いと上の面しか見えず平たく見える）
+    const dir = new THREE.Vector3(0, 0.64, 0.77).normalize();
     this.camera.position.copy(dir.multiplyScalar(dist));
     this.camera.lookAt(0, 0, 0);
   }
 
   private render() {
     this.renderer.render(this.scene, this.camera);
+  }
+
+  /** サイコロの真下の濃い影（床に乗っている感じを出す）。高く浮くほど薄く広がる */
+  private contactTexture: THREE.CanvasTexture | null = null;
+  private makeContactShadow() {
+    if (!this.contactTexture) {
+      const cv = document.createElement('canvas');
+      cv.width = cv.height = 128;
+      const c = cv.getContext('2d')!;
+      const g = c.createRadialGradient(64, 64, 0, 64, 64, 64);
+      g.addColorStop(0, 'rgba(0,0,0,0.85)');
+      g.addColorStop(0.45, 'rgba(0,0,0,0.5)');
+      g.addColorStop(1, 'rgba(0,0,0,0)');
+      c.fillStyle = g;
+      c.fillRect(0, 0, 128, 128);
+      this.contactTexture = new THREE.CanvasTexture(cv);
+      this.disposables.push(this.contactTexture);
+    }
+    const mat = new THREE.MeshBasicMaterial({ map: this.contactTexture, transparent: true, depthWrite: false });
+    const blob = new THREE.Mesh(new THREE.PlaneGeometry(DIE * 1.5, DIE * 1.5), mat);
+    blob.rotation.x = -Math.PI / 2;
+    blob.renderOrder = -1;
+    this.disposables.push(mat, blob.geometry);
+    return blob;
+  }
+
+  private syncContact(i: number) {
+    const { group, contact } = this.dice[i];
+    const h = Math.max(0, group.position.y - DIE / 2);
+    contact.position.set(group.position.x, 0.002, group.position.z);
+    contact.scale.setScalar(1 + h * 0.5);
+    (contact.material as THREE.MeshBasicMaterial).opacity = Math.max(0, 1 - h / 1.8);
   }
 
   private ensureDice(count: number) {
@@ -313,9 +350,14 @@ export class DiceScene {
       const group = new THREE.Group();
       group.add(mesh);
       this.scene.add(group);
-      this.dice.push({ group, mesh });
+      const contact = this.makeContactShadow();
+      this.scene.add(contact);
+      this.dice.push({ group, mesh, contact });
     }
-    this.dice.forEach((d, i) => (d.group.visible = i < count));
+    this.dice.forEach((d, i) => {
+      d.group.visible = i < count;
+      d.contact.visible = i < count;
+    });
     if (count !== this.count) {
       this.count = count;
       this.resize();
@@ -329,10 +371,44 @@ export class DiceScene {
     values.forEach((v, i) => {
       const { group, mesh } = this.dice[i];
       group.position.set((i - (values.length - 1) / 2) * gap, DIE / 2, this.mode === 'tray' ? 0.2 : 0);
-      group.quaternion.setFromAxisAngle(UP, (i === 0 ? 1 : -1) * 0.35);
+      group.quaternion.setFromAxisAngle(UP, (i === 0 ? 1 : -1) * 0.6);
       mesh.quaternion.setFromUnitVectors(VALUE_NORMAL[v], UP);
+      this.syncContact(i);
     });
     this.render();
+  }
+
+  /**
+   * 止まったサイコロがカメラに真正面を向くと、正方形 1 枚に見えて平たい。
+   * 転がり全体を、止まった位置を中心に水平に少し回して、斜め（25〜40°）を向いて止まるようにする。
+   * 全部のサイコロを同じだけ回すので、サイコロ同士のぶつかり方は崩れない
+   */
+  private turnToDiagonal(rec: Recording, count: number, rand: () => number) {
+    const last = rec.frames - 1;
+    const q0 = new THREE.Quaternion().fromArray(rec.quat[0], last * 4);
+    // 横向きの面の法線のうち 1 つを、水平面での角度にする（カメラ正面 = 0）
+    const top = this.topAxis(rec.quat[0], last).axis;
+    const side = LOCAL_AXES.find((a) => Math.abs(a.dot(top)) < 0.5)!.clone().applyQuaternion(q0);
+    const quarter = Math.PI / 2;
+    const phi = (((Math.atan2(side.x, side.z) % quarter) + quarter) % quarter); // 0〜90°
+    const target = THREE.MathUtils.degToRad(25 + rand() * 15) * (rand() < 0.5 ? 1 : -1) + (rand() < 0.5 ? 0 : quarter);
+    let delta = target - phi;
+    delta = ((((delta + quarter / 2) % quarter) + quarter) % quarter) - quarter / 2; // -45〜45° に収める
+
+    const cx = rec.pos.slice(0, count).reduce((s, p) => s + p[last * 3], 0) / count;
+    const cz = rec.pos.slice(0, count).reduce((s, p) => s + p[last * 3 + 2], 0) / count;
+    const rot = new THREE.Quaternion().setFromAxisAngle(UP, delta);
+    const v = new THREE.Vector3();
+    const q = new THREE.Quaternion();
+    for (let i = 0; i < count; i++) {
+      for (let f = 0; f < rec.frames; f++) {
+        const p = rec.pos[i];
+        v.set(p[f * 3] - cx, p[f * 3 + 1], p[f * 3 + 2] - cz).applyQuaternion(rot);
+        p[f * 3] = v.x + cx;
+        p[f * 3 + 2] = v.z + cz;
+        q.fromArray(rec.quat[i], f * 4).premultiply(rot).toArray(rec.quat[i], f * 4);
+      }
+    }
   }
 
   /** 物理演算を最後まで先に計算する */
@@ -457,6 +533,7 @@ export class DiceScene {
       return Promise.resolve();
     }
     const recording = rec;
+    this.turnToDiagonal(recording, values.length, rand);
 
     // 上を向く面に、出したい目が来るよう見た目だけ回す
     values.forEach((v, i) => {
@@ -476,6 +553,7 @@ export class DiceScene {
         const q = recording.quat[i];
         this.dice[i].group.position.set(p[f * 3], p[f * 3 + 1], p[f * 3 + 2]);
         this.dice[i].group.quaternion.set(q[f * 4], q[f * 4 + 1], q[f * 4 + 2], q[f * 4 + 3]);
+        this.syncContact(i);
       });
       this.render();
     };
