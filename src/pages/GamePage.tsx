@@ -268,8 +268,9 @@ export const GamePage: React.FC<Props> = ({ roomId, userId }) => {
                       </div>
 
                       {actions.pendingDiceTotal !== null ? (
-                        <button className="btn-pop btn-green" onClick={actions.handleConfirmMove} disabled={!isMyTurn}>
-                          👉 この出目（{actions.pendingDiceTotal}マス）で進む！
+                        // サイコロが止まって結果表示が閉じたら、自動で次のフェーズへ進む
+                        <button className="btn-pop btn-green" disabled>
+                          🚃 {actions.pendingDiceTotal}マス進みます…
                         </button>
                       ) : (
                         <button className="btn-pop" onClick={actions.handleRollDice} disabled={!isMyTurn || !opponent || actions.isRollingDice}>
@@ -398,6 +399,10 @@ export const GamePage: React.FC<Props> = ({ roomId, userId }) => {
           values={actions.pendingDiceValues}
           bonus={actions.pendingDiceBonus}
           seed={actions.diceSeed}
+          onDone={(key) => {
+            // 進める操作は振った人の端末だけが行う（2 台で二重に進まないように）
+            if (isMyTurn && key === actions.diceRollKey) actions.handleConfirmMove();
+          }}
         />
       </Suspense>
     </div>

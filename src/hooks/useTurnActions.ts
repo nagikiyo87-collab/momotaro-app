@@ -103,12 +103,8 @@ export const useTurnActions = (
 
   const handleConfirmMove = async () => {
     if (pendingDiceTotal === null) return;
-    let itemMessage = '';
-    if (activeItemEffect === 'i_dice_plus2') itemMessage = `🎲 ダイス+2カードの効果が適用されました！`;
-    else if (activeItemEffect === 'i_dice_double') itemMessage = `🎲 サイコロ2個振りの効果が適用されました！`;
-    
-    // UIのアラート待機は残す
-    if (itemMessage) await showAlert(itemMessage);
+    // サイコロが止まったら自動で呼ばれる（ボタンなし）。カードの効果はサイコロの結果表示に
+    // 「3 ＋ 2（カード）」のように出るので、ここで確認表示は出さない
 
     let nextPosition = sharedPosition + pendingDiceTotal;
     if (nextPosition >= STATIONS.length - 1) nextPosition = STATIONS.length - 1;
