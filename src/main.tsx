@@ -1,4 +1,4 @@
-import { StrictMode, useState, useEffect } from 'react';
+import { StrictMode, Suspense, lazy, useState, useEffect } from 'react';
 import { createRoot } from 'react-dom/client';
 import './styles/index.css';
 
@@ -88,12 +88,24 @@ const App = () => {
   );
 };
 
+// 試作画面（?lab=dice）。ゲーム本体とは別に読み込むので、通常の起動は重くならない
+const DiceLab = lazy(() => import('./pages/DiceLab'));
+const isDiceLab = new URLSearchParams(window.location.search).get('lab') === 'dice';
+
 createRoot(document.getElementById('root')!).render(
-  <StrictMode>
-    <ModalProvider>
-      <App />
-    </ModalProvider>
-  </StrictMode>,
+  isDiceLab ? (
+    <StrictMode>
+      <Suspense fallback={null}>
+        <DiceLab />
+      </Suspense>
+    </StrictMode>
+  ) : (
+    <StrictMode>
+      <ModalProvider>
+        <App />
+      </ModalProvider>
+    </StrictMode>
+  ),
 );
 
 if ('serviceWorker' in navigator) {
