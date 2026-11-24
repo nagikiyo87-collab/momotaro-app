@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useRef } from 'react';
-import { DiceScene } from './diceScene';
+import { DiceScene, type DiceMode } from './diceScene';
 
 /**
  * 3D サイコロ（three.js ＋ 物理演算）。置いた場所いっぱいに盤とサイコロを描く
@@ -13,10 +13,12 @@ type Props = {
   rollId: number;
   sound?: boolean;
   seed?: number;
+  /** tray：緑の盤の上 ／ stage：画面いっぱいに大きく（最初に作るときだけ有効） */
+  mode?: DiceMode;
   onLanded?: () => void;
 };
 
-export const Dice3D = ({ values, rollId, sound = true, seed, onLanded }: Props) => {
+export const Dice3D = ({ values, rollId, sound = true, seed, mode = 'stage', onLanded }: Props) => {
   const hostRef = useRef<HTMLDivElement>(null);
   const sceneRef = useRef<DiceScene | null>(null);
   const latest = useRef({ values, sound, seed, onLanded });
@@ -27,13 +29,15 @@ export const Dice3D = ({ values, rollId, sound = true, seed, onLanded }: Props) 
   // 盤を作る（画面から消えたら片付ける）
   useEffect(() => {
     if (!hostRef.current) return;
-    const scene = new DiceScene(hostRef.current);
+    const scene = new DiceScene(hostRef.current, { mode });
     scene.setRest(latest.current.values);
     sceneRef.current = scene;
     return () => {
       scene.dispose();
       sceneRef.current = null;
     };
+    // mode は作るときだけ使う
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // 投げる

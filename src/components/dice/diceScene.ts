@@ -160,6 +160,9 @@ type Recording = {
   hits: { frame: number; volume: number; hard: boolean }[];
 };
 
+/** tray：緑の盤の上で転がす ／ stage：画面いっぱいに大きく、床なしで影だけ（ゲーム画面の上に重ねる用） */
+export type DiceMode = 'tray' | 'stage';
+
 const DIE = 1; // サイコロの一辺
 const FPS = 60;
 
@@ -176,9 +179,12 @@ export class DiceScene {
   private bounds = { xMin: -2, xMax: 2, zMin: -1.5, zMax: 1.5 };
 
   private container: HTMLElement;
+  private mode: DiceMode;
+  private count = 1;
 
-  constructor(container: HTMLElement) {
+  constructor(container: HTMLElement, opts: { mode?: DiceMode } = {}) {
     this.container = container;
+    this.mode = opts.mode ?? 'stage';
     this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -199,9 +205,6 @@ export class DiceScene {
     pmrem.dispose();
     this.disposables.push(envTex);
 
-    this.camera.position.set(0, 5.9, 3.5);
-    this.camera.lookAt(0, 0, 0.25);
-
     // 照明：左上から太陽のような光（影を落とす）＋全体の柔らかい光
     const sun = new THREE.DirectionalLight(0xfff4e0, 2.4);
     sun.position.set(-3.5, 9, 4);
@@ -216,19 +219,20 @@ export class DiceScene {
     this.scene.add(sun);
     this.scene.add(new THREE.HemisphereLight(0xffffff, 0x1a3a26, 0.35));
 
-    // フェルトの盤
-    const felt = drawFelt();
-    const floorMat = new THREE.MeshStandardMaterial({
-      color: 0x155a35,
-      roughness: 0.95,
-      bumpMap: felt,
-      bumpScale: 0.6,
-    });
+    // 床：盤モードはフェルト、ステージモードは床を描かず影だけを落とす（下の画面が透けて見える）
+    let floorMat: THREE.Material;
+    if (this.mode === 'tray') {
+      const felt = drawFelt();
+      floorMat = new THREE.MeshStandardMaterial({ color: 0x155a35, roughness: 0.95, bumpMap: felt, bumpScale: 0.6 });
+      this.disposables.push(felt);
+    } else {
+      floorMat = new THREE.ShadowMaterial({ opacity: 0.4 });
+    }
     const floor = new THREE.Mesh(new THREE.PlaneGeometry(40, 40), floorMat);
     floor.rotation.x = -Math.PI / 2;
     floor.receiveShadow = true;
     this.scene.add(floor);
-    this.disposables.push(felt, floorMat, floor.geometry);
+    this.disposables.push(floorMat, floor.geometry);
 
     // サイコロの材質：艶のある樹脂
     this.materials = FACE_VALUES.map((v) => {
@@ -257,6 +261,7 @@ export class DiceScene {
     this.renderer.setSize(w, h, false);
     this.camera.aspect = w / h;
     this.camera.updateProjectionMatrix();
+    this.placeCamera();
 
     // 画面の四隅から、サイコロの中心の高さ（y = DIE/2）の面に光線を飛ばして範囲を求める
     const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -DIE / 2);
@@ -267,10 +272,33 @@ export class DiceScene {
     };
     const tl = hit(-1, 1);
     const bl = hit(-1, -1);
-    const margin = DIE * 0.75;
+    const margin = this.mode === 'stage' ? DIE * 0.6 : DIE * 0.75;
     const xHalf = Math.min(Math.abs(tl.x), Math.abs(bl.x)) - margin;
     this.bounds = { xMin: -xHalf, xMax: xHalf, zMin: tl.z + margin, zMax: bl.z - margin };
+    if (this.mode === 'stage') {
+      // 縦長の画面では奥行きが広くなりすぎるので、画面の中央付近で止まるよう絞る（下の出目表示と重ならない）
+      this.bounds.zMin = Math.max(this.bounds.zMin, -1.7);
+      this.bounds.zMax = Math.min(this.bounds.zMax, 0.4);
+    }
     this.render();
+  }
+
+  /**
+   * カメラの位置。盤モードは固定。ステージモードは、サイコロが画面いっぱいに大きく見えるよう
+   * 「見える幅がサイコロ何個分か」から距離を決める（1 個なら約 3.4 個分、2 個なら約 4.6 個分）
+   */
+  private placeCamera() {
+    if (this.mode === 'tray') {
+      this.camera.position.set(0, 5.9, 3.5);
+      this.camera.lookAt(0, 0, 0.25);
+      return;
+    }
+    const t = Math.tan(THREE.MathUtils.degToRad(this.camera.fov / 2));
+    const width = this.count > 1 ? 4.6 : 3.4;
+    const dist = Math.max(width / (2 * t * this.camera.aspect), 3.4 / (2 * t));
+    const dir = new THREE.Vector3(0, 0.86, 0.51).normalize();
+    this.camera.position.copy(dir.multiplyScalar(dist));
+    this.camera.lookAt(0, 0, 0);
   }
 
   private render() {
@@ -288,6 +316,10 @@ export class DiceScene {
       this.dice.push({ group, mesh });
     }
     this.dice.forEach((d, i) => (d.group.visible = i < count));
+    if (count !== this.count) {
+      this.count = count;
+      this.resize();
+    }
   }
 
   /** 投げずに、指定の目を上にして置く */
@@ -296,7 +328,7 @@ export class DiceScene {
     const gap = DIE * 1.6;
     values.forEach((v, i) => {
       const { group, mesh } = this.dice[i];
-      group.position.set((i - (values.length - 1) / 2) * gap, DIE / 2, 0.2);
+      group.position.set((i - (values.length - 1) / 2) * gap, DIE / 2, this.mode === 'tray' ? 0.2 : 0);
       group.quaternion.setFromAxisAngle(UP, (i === 0 ? 1 : -1) * 0.35);
       mesh.quaternion.setFromUnitVectors(VALUE_NORMAL[v], UP);
     });
@@ -347,11 +379,18 @@ export class DiceScene {
         sleepSpeedLimit: 0.15,
         sleepTimeLimit: 0.25,
       });
-      // 右の手前寄りから、左へ向かって横に投げる（盤の真ん中あたりで止まりやすい）
-      // 高い位置から始めるので、画面の外から飛び込んでくるように見える
       const zMid = (zMin + zMax) / 2;
-      body.position.set(xMax - 0.2, 2.6 + rand() * 1.0 + i * 0.5, zMid + (i - 0.5) * 1.3 + (rand() - 0.5) * 0.8);
-      body.velocity.set(-(4.5 + rand() * 2.5), 0.5 + rand() * 1.5, (rand() - 0.5) * 2.5);
+      if (this.mode === 'tray') {
+        // 右の手前寄りから、左へ向かって横に投げる（盤の真ん中あたりで止まりやすい）
+        body.position.set(xMax - 0.2, 2.6 + rand() * 1.0 + i * 0.5, zMid + (i - 0.5) * 1.3 + (rand() - 0.5) * 0.8);
+        body.velocity.set(-(4.5 + rand() * 2.5), 0.5 + rand() * 1.5, (rand() - 0.5) * 2.5);
+      } else {
+        // カメラのすぐ近く（高い所）から、回転しながら画面の真ん中へ落ちてくる。
+        // 近いほど大きく見えるので、飛び込んでくる迫力が出る
+        const xOff = count > 1 ? (i - 0.5) * 1.5 : 0;
+        body.position.set(xOff + 0.6 + rand() * 0.4, 4.2 + rand() * 0.8 + i * 0.3, zMid + 0.8 + (rand() - 0.5) * 0.6);
+        body.velocity.set(-(1.2 + rand() * 1.2), 1 + rand() * 1.5, -(1.2 + rand() * 1.0));
+      }
       body.angularVelocity.set((rand() - 0.5) * 40, (rand() - 0.5) * 40, (rand() - 0.5) * 40);
       body.quaternion.setFromEuler(rand() * 6.28, rand() * 6.28, rand() * 6.28);
       let lastHit = -10;
