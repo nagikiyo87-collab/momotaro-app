@@ -49,9 +49,9 @@ export const PlayerCards: React.FC<{
   bombyPossessedId: string | null; bombyType: string; inviteUrl: string;
 }> = ({ me, opponent, isMyTurn, userId, opponentId, bombyPossessedId, bombyType, inviteUrl }) => {
   const getBombyImageUrl = (type: string) => {
-    if (type === 'king') return '/bomby-king.png';
-    if (type === 'petit') return '/bomby-petit.png';
-    return '/bomby-normal.png';
+    if (type === 'king') return '/bomby-king.webp';
+    if (type === 'petit') return '/bomby-petit.webp';
+    return '/bomby-normal.webp';
   };
   const getBombyIcon = (type: string) => type === 'king' ? '👑' : type === 'petit' ? '👼' : '😈';
 

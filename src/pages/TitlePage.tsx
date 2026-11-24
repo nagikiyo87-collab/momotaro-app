@@ -94,7 +94,7 @@ export const TitlePage: React.FC<Props> = ({ onHostGame, onJoinGame, savedRoomId
           paddingBottom: '15vh',
           boxSizing: 'border-box', 
           overflow: 'hidden',      
-          backgroundImage: 'url(/home.png)',
+          backgroundImage: 'url(/home.webp)',
           backgroundSize: 'cover', 
           backgroundPosition: 'center',
           backgroundRepeat: 'no-repeat',
