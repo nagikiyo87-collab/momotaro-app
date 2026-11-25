@@ -1,140 +1,126 @@
 import { motion } from 'framer-motion';
+import { BombyIllustration } from './BombyIllustration';
 
 /**
- * プレイヤーの汽車のイラスト（オリジナル。SVG で描くので軽く、拡大してもきれい）
- * - color：車体の色（プレイヤーごと）
- * - 車輪が回り、煙突から煙が出る。少しだけ上下に揺れて走っているように見せる
- * - bombyImage を渡すと、汽車の後ろに貧乏神がついてきて、ずっとふわふわ動く
+ * プレイヤーの電車のイラスト（オリジナル。SVG）
+ * 今回の路線（京王線：新宿〜高尾山口）の通勤電車をイメージ。白い車体に色の帯、パンタグラフ、行先表示。
+ * 会社のロゴやマークは入れない。帯の色でプレイヤーを見分ける。
+ * - 車輪が回り、線路のまくら木が流れて、走っているように見せる
+ * - bombyType を渡すと、電車の後ろから貧乏神が追いかけてくる
  */
 type Props = {
+  /** 太い帯の色（プレイヤーの色） */
   color: string;
-  darkColor: string;
-  bombyImage?: string | null;
-  bombyType?: string;
+  /** 細い帯の色 */
+  accent: string;
+  /** 行先表示 */
+  destination?: string;
+  bombyType?: string | null;
   running?: boolean;
 };
 
-const Wheel = ({ cx, cy, r, spin }: { cx: number; cy: number; r: number; spin: boolean }) => (
+const Wheel = ({ cx, cy, spin }: { cx: number; cy: number; spin: boolean }) => (
   <g>
-    <circle cx={cx} cy={cy} r={r} fill="#2d3436" />
-    <circle cx={cx} cy={cy} r={r * 0.78} fill="#dfe6e9" />
-    {/* SVG の中で回すときは transformBox: fill-box にしないと、回転の中心がずれて飛んでいく */}
+    <circle cx={cx} cy={cy} r={6.5} fill="#2d3436" />
     <motion.g
       style={{ transformBox: 'fill-box', transformOrigin: 'center' }}
-      animate={spin ? { rotate: 360 } : { rotate: 0 }}
-      transition={spin ? { repeat: Infinity, ease: 'linear', duration: 1.2 } : undefined}
+      animate={spin ? { rotate: 360 } : undefined}
+      transition={spin ? { repeat: Infinity, ease: 'linear', duration: 0.7 } : undefined}
     >
-      {[0, 60, 120].map((deg) => (
-        <rect key={deg} x={cx - r * 0.72} y={cy - 1.6} width={r * 1.44} height={3.2} rx={1.6} fill="#636e72" transform={`rotate(${deg} ${cx} ${cy})`} />
-      ))}
+      <circle cx={cx} cy={cy} r={4.5} fill="#b2bec3" />
+      <rect x={cx - 4.5} y={cy - 0.8} width={9} height={1.6} fill="#636e72" />
+      <rect x={cx - 0.8} y={cy - 4.5} width={1.6} height={9} fill="#636e72" />
     </motion.g>
-    <circle cx={cx} cy={cy} r={r * 0.22} fill="#fdcb6e" stroke="#2d3436" strokeWidth={1.5} />
   </g>
 );
 
-const Smoke = ({ delay }: { delay: number }) => (
-  <motion.circle
-    cx={176}
-    cy={22}
-    r={7}
-    fill="#ffffff"
-    stroke="#dfe6e9"
-    strokeWidth={2}
-    initial={{ opacity: 0, scale: 0.4, x: 0, y: 0 }}
-    animate={{ opacity: [0, 0.95, 0], scale: [0.4, 1.2, 1.8], x: [0, -10, -26], y: [0, -14, -26] }}
-    transition={{ repeat: Infinity, duration: 2.2, delay, ease: 'easeOut' }}
-  />
+const Bogie = ({ x, spin }: { x: number; spin: boolean }) => (
+  <g>
+    <rect x={x - 16} y={92} width={32} height={6} rx={2} fill="#4b5563" />
+    <Wheel cx={x - 9} cy={100} spin={spin} />
+    <Wheel cx={x + 9} cy={100} spin={spin} />
+  </g>
 );
 
-export const TrainIllustration = ({ color, darkColor, bombyImage, bombyType = 'normal', running = true }: Props) => {
-  // キングは大きく、プチは小さく
-  const bombySize = bombyType === 'king' ? 92 : bombyType === 'petit' ? 58 : 76;
+export const TrainIllustration = ({ color, accent, destination = '高尾山口', bombyType = null, running = true }: Props) => {
+  // 窓（車体の横に並ぶ）とドア
+  const windows = [44, 82, 130, 168];
+  const doors = [62, 110, 150];
   return (
     <div style={{ position: 'relative', width: '100%', height: 150 }}>
-      {/* 貧乏神：汽車の後ろ（左）について、ふわふわ上下＋左右に揺れる */}
-      {bombyImage && (
-        <motion.img
-          src={bombyImage}
-          alt="貧乏神"
-          draggable={false}
-          style={{
-            position: 'absolute',
-            left: '4%',
-            bottom: 40,
-            width: bombySize,
-            height: bombySize,
-            objectFit: 'contain',
-            zIndex: 0,
-            filter: 'drop-shadow(0 6px 6px rgba(0,0,0,0.25))',
-            pointerEvents: 'none',
-          }}
-          animate={{ y: [0, -12, 0, -6, 0], rotate: [-6, 5, -3, 6, -6], x: [0, 4, 0, -3, 0] }}
-          transition={{ repeat: Infinity, duration: 2.6, ease: 'easeInOut' }}
-        />
+      {/* 貧乏神：電車の後ろ（左）から、全身で追いかけてくる */}
+      {bombyType && (
+        <div style={{ position: 'absolute', left: '1%', bottom: 22, zIndex: 2, pointerEvents: 'none' }}>
+          <BombyIllustration type={bombyType} size={bombyType === 'king' ? 74 : bombyType === 'petit' ? 48 : 62} />
+        </div>
       )}
 
       <motion.svg
-        viewBox="0 0 240 140"
-        style={{ position: 'absolute', right: '2%', bottom: 0, width: '78%', height: 'auto', zIndex: 1, overflow: 'visible' }}
-        animate={running ? { y: [0, -2, 0] } : undefined}
-        transition={running ? { repeat: Infinity, duration: 0.45, ease: 'easeInOut' } : undefined}
+        viewBox="0 0 260 112"
+        style={{ position: 'absolute', right: 0, bottom: 6, width: bombyType ? '80%' : '94%', height: 'auto', zIndex: 1, overflow: 'visible', transition: 'width 0.3s' }}
+        animate={running ? { y: [0, -1.2, 0] } : undefined}
+        transition={running ? { repeat: Infinity, duration: 0.35, ease: 'easeInOut' } : undefined}
       >
-        {/* 煙 */}
-        {running && [0, 0.7, 1.4].map((d) => <Smoke key={d} delay={d} />)}
+        {/* 架線 */}
+        <line x1={0} y1={6} x2={260} y2={6} stroke="#95a5a6" strokeWidth={1} />
+        {/* パンタグラフ */}
+        <g stroke="#4b5563" strokeWidth={1.8} fill="none" strokeLinejoin="round">
+          <motion.path
+            d="M96 22 L106 10 L116 22 M100 10 L112 10"
+            animate={running ? { d: ['M96 22 L106 10 L116 22 M100 10 L112 10', 'M96 22 L106 9 L116 22 M100 9 L112 9', 'M96 22 L106 10 L116 22 M100 10 L112 10'] } : undefined}
+            transition={{ repeat: Infinity, duration: 0.6 }}
+          />
+        </g>
 
-        {/* 線路 */}
-        <rect x={0} y={128} width={240} height={5} rx={2.5} fill="#b2bec3" />
+        {/* 車体（白っぽいステンレス） */}
+        <path
+          d="M14 30 Q14 22 22 22 L214 22 Q230 22 240 34 L250 52 Q254 60 254 70 L254 84 Q254 90 248 90 L20 90 Q14 90 14 84 Z"
+          fill="#f8f9fb"
+          stroke="#aab4be"
+          strokeWidth={2}
+        />
+        {/* 屋根 */}
+        <path d="M22 22 L214 22 Q228 22 236 30 L20 30 Q16 30 16 27 Q17 22 22 22Z" fill="#dfe4ea" />
 
-        {/* 炭水車（後ろの車両） */}
-        <rect x={6} y={66} width={58} height={44} rx={10} fill={color} stroke={darkColor} strokeWidth={3} />
-        <rect x={12} y={58} width={46} height={14} rx={6} fill="#2d3436" />
-        <circle cx={22} cy={60} r={6} fill="#2d3436" />
-        <circle cx={36} cy={57} r={7} fill="#2d3436" />
-        <circle cx={50} cy={60} r={6} fill="#2d3436" />
-        <rect x={14} y={80} width={42} height={6} rx={3} fill="#ffffff" opacity={0.85} />
-        <Wheel cx={22} cy={116} r={11} spin={running} />
-        <Wheel cx={50} cy={116} r={11} spin={running} />
-        {/* 連結器 */}
-        <rect x={62} y={100} width={12} height={6} rx={3} fill="#636e72" />
+        {/* 側面の窓 */}
+        {windows.map((x) => (
+          <rect key={x} x={x} y={36} width={30} height={20} rx={3} fill="#cfe8ff" stroke="#8fa3b5" strokeWidth={1.2} />
+        ))}
+        {/* ドア */}
+        {doors.map((x) => (
+          <g key={x}>
+            <rect x={x} y={32} width={16} height={56} rx={2} fill="#eef1f5" stroke="#9aa8b5" strokeWidth={1.2} />
+            <rect x={x + 2.5} y={38} width={4.5} height={16} rx={1.5} fill="#cfe8ff" />
+            <rect x={x + 9} y={38} width={4.5} height={16} rx={1.5} fill="#cfe8ff" />
+          </g>
+        ))}
 
-        {/* 運転室 */}
-        <rect x={70} y={40} width={50} height={70} rx={10} fill={color} stroke={darkColor} strokeWidth={3} />
-        <rect x={64} y={32} width={62} height={12} rx={6} fill={darkColor} />
-        <rect x={80} y={50} width={30} height={24} rx={6} fill="#dff9fb" stroke="#ffffff" strokeWidth={3} />
-        <rect x={78} y={84} width={34} height={6} rx={3} fill="#ffffff" opacity={0.85} />
+        {/* 帯（プレイヤーの色） */}
+        <rect x={15} y={62} width={226} height={7} fill={color} />
+        <rect x={15} y={71} width={230} height={3} fill={accent} />
 
-        {/* ボイラー（丸い胴） */}
-        <rect x={116} y={58} width={88} height={52} rx={24} fill={color} stroke={darkColor} strokeWidth={3} />
-        <rect x={124} y={66} width={40} height={8} rx={4} fill="#ffffff" opacity={0.35} />
-        {/* 帯 */}
-        <rect x={140} y={58} width={7} height={52} fill="#fdcb6e" />
-        <rect x={172} y={58} width={7} height={52} fill="#fdcb6e" />
-        {/* 正面 */}
-        <circle cx={204} cy={84} r={22} fill={darkColor} />
-        <circle cx={204} cy={84} r={16} fill={color} stroke="#ffffff" strokeWidth={3} />
-        <path d="M204 74 l3 6.5 7 0.8 -5.2 4.8 1.5 7 -6.3 -3.6 -6.3 3.6 1.5 -7 -5.2 -4.8 7 -0.8z" fill="#fdcb6e" />
-        {/* 煙突 */}
-        <rect x={168} y={30} width={16} height={30} rx={4} fill="#2d3436" />
-        <rect x={163} y={24} width={26} height={10} rx={5} fill="#2d3436" />
-        {/* 蒸気だめ */}
-        <ellipse cx={150} cy={58} rx={10} ry={8} fill="#fdcb6e" stroke={darkColor} strokeWidth={2} />
-        {/* ライト */}
-        <circle cx={222} cy={66} r={7} fill="#ffeaa7" stroke="#2d3436" strokeWidth={2} />
-        {/* 排障器 */}
-        <path d="M206 110 L232 110 L238 126 L206 126 Z" fill="#636e72" />
-        <path d="M212 112 L216 124 M220 112 L224 124 M228 112 L232 124" stroke="#b2bec3" strokeWidth={2} />
+        {/* 前面：大きな窓・行先表示・ライト */}
+        <path d="M218 30 Q230 30 238 40 L246 56 L218 56 Z" fill="#2d3e50" />
+        <path d="M222 34 L234 34 L242 52 L222 52 Z" fill="#5d7a96" opacity={0.6} />
+        <rect x={208} y={25} width={30} height={7} rx={1.5} fill="#1e272e" />
+        <text x={223} y={30.6} fontSize={5.2} fill="#ffb142" textAnchor="middle" fontWeight={700} fontFamily="'Hiragino Sans', sans-serif">
+          {destination}
+        </text>
+        <circle cx={248} cy={76} r={3.2} fill="#fff7d6" stroke="#9aa8b5" />
+        <rect x={244} y={82} width={10} height={3} rx={1.5} fill="#e74c3c" opacity={0.8} />
+        {/* スカート（床下のカバー） */}
+        <path d="M236 90 L254 90 L250 96 L236 96 Z" fill="#636e72" />
 
-        {/* 動輪 */}
-        <Wheel cx={92} cy={112} r={15} spin={running} />
-        <Wheel cx={134} cy={112} r={15} spin={running} />
-        <Wheel cx={176} cy={112} r={15} spin={running} />
-        {/* 連結棒 */}
-        {/* 連結棒は車輪に合わせて円を描くように動かす（rect の x・y は framer-motion では位置ずらしになるので g ごと動かす） */}
-        <motion.g
-          animate={running ? { x: [0, 4, 0, -4, 0], y: [0, -5, 0, 5, 0] } : undefined}
-          transition={running ? { repeat: Infinity, duration: 1.2, ease: 'linear' } : undefined}
-        >
-          <rect x={88} y={110} width={94} height={5} rx={2.5} fill="#b2bec3" stroke="#636e72" strokeWidth={1} />
+        {/* 台車と車輪 */}
+        <Bogie x={52} spin={running} />
+        <Bogie x={200} spin={running} />
+
+        {/* 線路（まくら木が流れて走っているように見える） */}
+        <rect x={0} y={106} width={260} height={3} fill="#7f8c8d" />
+        <motion.g animate={running ? { x: [0, -20] } : undefined} transition={running ? { repeat: Infinity, ease: 'linear', duration: 0.5 } : undefined}>
+          {Array.from({ length: 15 }, (_, i) => (
+            <rect key={i} x={i * 20} y={109} width={10} height={3} fill="#a1887f" />
+          ))}
         </motion.g>
       </motion.svg>
     </div>

@@ -64,18 +64,13 @@ export const PlayerCards: React.FC<{
   me: any; opponent: any; isMyTurn: boolean; userId: string; opponentId: string | undefined;
   bombyPossessedId: string | null; bombyType: string; inviteUrl: string;
 }> = ({ me, opponent, isMyTurn, userId, opponentId, bombyPossessedId, bombyType, inviteUrl }) => {
-  const getBombyImageUrl = (type: string) => {
-    if (type === 'king') return '/bomby-king.webp';
-    if (type === 'petit') return '/bomby-petit.webp';
-    return '/bomby-normal.webp';
-  };
   const getBombyIcon = (type: string) => type === 'king' ? '👑' : type === 'petit' ? '👼' : '😈';
 
   const [detailPlayer, setDetailPlayer] = useState<'me' | 'opponent' | null>(null);
   const [slide, setSlide] = useState(0);
   const slides = [
-    { key: 'me' as const, player: me, uid: userId, label: me?.name ? `${me.name}（あなた）` : 'あなた', color: '#ff4757', dark: '#c0392b', isTurn: isMyTurn },
-    { key: 'opponent' as const, player: opponent, uid: opponentId, label: opponent?.name ?? 'あいて', color: '#1e90ff', dark: '#1565c0', isTurn: !isMyTurn && !!opponent },
+    { key: 'me' as const, player: me, uid: userId, label: me?.name ? `${me.name}（あなた）` : 'あなた', color: '#e5367a', accent: '#ff9ec7', dark: '#b0275f', isTurn: isMyTurn },
+    { key: 'opponent' as const, player: opponent, uid: opponentId, label: opponent?.name ?? 'あいて', color: '#1e6fd9', accent: '#8cc4ff', dark: '#1553a5', isTurn: !isMyTurn && !!opponent },
   ];
 
   const renderDetailModal = () => {
@@ -140,6 +135,39 @@ export const PlayerCards: React.FC<{
 
       {/* プレイヤー：汽車のイラスト＋その下に情報。左右にスライドして、自分と相手を切り替える */}
       <div style={{ position: 'relative', overflow: 'hidden', borderRadius: '20px', marginBottom: '25px', background: 'linear-gradient(180deg, #d6f0ff 0%, #f4fbff 70%, #ffffff 100%)', border: '3px solid #c7ecee', boxShadow: '0 6px 0 rgba(0,0,0,0.05)' }}>
+        {/* タブ：2 人の名前。タップでも切り替えられる */}
+        <div style={{ display: 'flex', gap: 6, padding: '10px 10px 0' }}>
+          {slides.map((sl, i) => (
+            <button
+              key={sl.key}
+              onClick={() => setSlide(i)}
+              style={{
+                flex: 1, border: 'none', borderRadius: 999, padding: '8px 4px', fontWeight: 900, fontSize: '0.85rem', cursor: 'pointer',
+                background: slide === i ? sl.color : 'rgba(255,255,255,0.8)', color: slide === i ? '#fff' : sl.dark,
+                boxShadow: slide === i ? `0 3px 0 ${sl.dark}` : '0 1px 0 rgba(0,0,0,0.08)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+              }}
+            >
+              🚃 {sl.label}{sl.isTurn ? ' 🎲' : ''}
+            </button>
+          ))}
+        </div>
+        {/* 左右の矢印（押すと切り替え。スライドできることも伝える） */}
+        {[0, 1].map((dir) => {
+          const target = dir === 0 ? slide - 1 : slide + 1;
+          if (target < 0 || target > 1) return null;
+          return (
+            <motion.button
+              key={dir}
+              onClick={() => setSlide(target)}
+              aria-label={dir === 0 ? '前のプレイヤー' : '次のプレイヤー'}
+              animate={{ x: dir === 0 ? [0, -4, 0] : [0, 4, 0] }}
+              transition={{ repeat: Infinity, duration: 1.2 }}
+              style={{ position: 'absolute', top: 105, [dir === 0 ? 'left' : 'right']: 4, zIndex: 5, width: 30, height: 30, borderRadius: '50%', border: 'none', background: 'rgba(255,255,255,0.9)', boxShadow: '0 2px 6px rgba(0,0,0,0.15)', fontSize: '1.2rem', fontWeight: 900, color: '#57606f', cursor: 'pointer', lineHeight: '30px', padding: 0 }}
+            >
+              {dir === 0 ? '‹' : '›'}
+            </motion.button>
+          );
+        })}
         <motion.div
           drag="x"
           dragConstraints={{ left: 0, right: 0 }}
@@ -158,14 +186,8 @@ export const PlayerCards: React.FC<{
             const total = (p?.money || 0) + (p?.properties || []).reduce((sum: number, x: Property) => sum + x.price, 0);
             return (
               <div key={sl.key} style={{ minWidth: '100%', boxSizing: 'border-box', padding: '14px 16px 18px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
-                  <span style={{ fontWeight: 900, fontSize: '1.15rem', color: sl.dark }}>{sl.label}</span>
-                  {sl.isTurn && (
-                    <span style={{ background: '#ff4757', color: '#fff', fontWeight: 900, fontSize: '0.75rem', padding: '4px 10px', borderRadius: 999 }}>🎲 代表者</span>
-                  )}
-                </div>
                 {p ? (
-                  <TrainIllustration color={sl.color} darkColor={sl.dark} bombyImage={possessed ? getBombyImageUrl(bombyType) : null} bombyType={bombyType} />
+                  <TrainIllustration color={sl.color} accent={sl.accent} bombyType={possessed ? bombyType : null} />
                 ) : (
                   <div style={{ height: 150, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
                     <QRCodeSVG value={inviteUrl} size={110} />
@@ -203,6 +225,9 @@ export const PlayerCards: React.FC<{
             />
           ))}
         </div>
+        <p style={{ margin: '-6px 0 10px', textAlign: 'center', fontSize: '0.75rem', fontWeight: 800, color: '#8395a7' }}>
+          ← 左右にスライドすると{slide === 0 ? '相手' : '自分'}の情報が見られます →
+        </p>
       </div>
     </>
   );
