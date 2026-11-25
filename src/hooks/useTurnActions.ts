@@ -185,6 +185,7 @@ export const useTurnActions = (
       // 目的地を決めるフェーズはなし（2026-11-25）。すぐミッションへ。目的地はミッション画面のメモに自由に追加
       phase: 'mission',
       destinationNotes: [],
+      missionResults: {},
       missionTimer: { isRunning: false, remainingSeconds: stayTime * 60, endTime: null },
     };
   };
@@ -209,11 +210,24 @@ export const useTurnActions = (
     updateDoc(doc(db, 'rooms', roomId), { destinationNotes: arrayRemove(note) }).catch(console.error);
   };
 
+  /**
+   * ミッションの成功・失敗を選ぶ（2 人とも選べて、2 台で同じ表示になる）。確定は代表者が行う。
+   * 協力ミッションは 2 人で 1 つの結果なので、両方に同じ値を入れる
+   */
+  const handleSetMissionResult = (targetUid: string, success: boolean, shared: boolean) => {
+    if (!opponentId) return;
+    const updates: Record<string, boolean> = shared
+      ? { [`missionResults.${userId}`]: success, [`missionResults.${opponentId}`]: success }
+      : { [`missionResults.${targetUid}`]: success };
+    updateDoc(doc(db, 'rooms', roomId), updates).catch(console.error);
+  };
+
   /** 目的地を決める画面で止まっている古い部屋（この変更より前に作った部屋）をミッションへ進める */
   const handleSkipToMission = () => {
     const time = roomData?.stayTime || 30;
     updateDoc(doc(db, 'rooms', roomId), {
       phase: 'mission',
+      missionResults: {},
       missionTimer: { isRunning: false, remainingSeconds: time * 60, endTime: null },
     }).catch(console.error);
   };
@@ -549,7 +563,7 @@ export const useTurnActions = (
     spentInput, setSpentInput,
     handleRollDice, handleConfirmMove, handleUseItem, handleDiscardItem, 
     handleArrive, 
-    handleAddDestinationNote, handleRemoveDestinationNote, handleSkipToMission, 
+    handleAddDestinationNote, handleRemoveDestinationNote, handleSkipToMission, handleSetMissionResult, 
     handleEndMission, handleSubmitSpending, handleFinishSpending, 
     handleSubmitBid, handleRevealBids, handleBombyAction,
   };

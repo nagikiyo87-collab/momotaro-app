@@ -5,6 +5,7 @@ import { STATIONS, ITEMS, START_MONEY, RANK_THRESHOLDS, SQUARE_STYLE, type Squar
 import { useModal } from '../contexts/ModalContext';
 import { doc, updateDoc } from 'firebase/firestore';
 import { db } from '../firebase';
+import { TrainIllustration } from './player/TrainIllustration';
 
 // --- ① ヘッダー UI ---
 export const GameHeader: React.FC<{ 
@@ -71,6 +72,11 @@ export const PlayerCards: React.FC<{
   const getBombyIcon = (type: string) => type === 'king' ? '👑' : type === 'petit' ? '👼' : '😈';
 
   const [detailPlayer, setDetailPlayer] = useState<'me' | 'opponent' | null>(null);
+  const [slide, setSlide] = useState(0);
+  const slides = [
+    { key: 'me' as const, player: me, uid: userId, label: me?.name ? `${me.name}（あなた）` : 'あなた', color: '#ff4757', dark: '#c0392b', isTurn: isMyTurn },
+    { key: 'opponent' as const, player: opponent, uid: opponentId, label: opponent?.name ?? 'あいて', color: '#1e90ff', dark: '#1565c0', isTurn: !isMyTurn && !!opponent },
+  ];
 
   const renderDetailModal = () => {
     if (!detailPlayer) return null;
@@ -132,51 +138,70 @@ export const PlayerCards: React.FC<{
     <>
       {renderDetailModal()}
 
-      <div style={{ display: 'flex', justifyContent: 'space-between', gap: '15px', marginBottom: '25px' }}>
-        <div 
-          onClick={() => setDetailPlayer('me')} 
-          style={{ flex: 1, position: 'relative', overflow: 'hidden', background: '#ffffff', padding: '20px 15px', borderRadius: '16px', textAlign: 'center', border: isMyTurn ? '4px solid #ff4757' : '4px solid #dcdde1', boxShadow: isMyTurn ? '0 8px 0 rgba(255,71,87,0.3)' : '0 6px 0 rgba(0,0,0,0.1)', transform: isMyTurn ? 'translateY(-4px)' : 'none', transition: 'all 0.2s', cursor: 'pointer' }}
+      {/* プレイヤー：汽車のイラスト＋その下に情報。左右にスライドして、自分と相手を切り替える */}
+      <div style={{ position: 'relative', overflow: 'hidden', borderRadius: '20px', marginBottom: '25px', background: 'linear-gradient(180deg, #d6f0ff 0%, #f4fbff 70%, #ffffff 100%)', border: '3px solid #c7ecee', boxShadow: '0 6px 0 rgba(0,0,0,0.05)' }}>
+        <motion.div
+          drag="x"
+          dragConstraints={{ left: 0, right: 0 }}
+          dragElastic={0.25}
+          onDragEnd={(_, info) => {
+            if (info.offset.x < -50 || info.velocity.x < -400) setSlide(1);
+            else if (info.offset.x > 50 || info.velocity.x > 400) setSlide(0);
+          }}
+          animate={{ x: `${-slide * 100}%` }}
+          transition={{ type: 'spring', stiffness: 320, damping: 34 }}
+          style={{ display: 'flex', touchAction: 'pan-y' }}
         >
-          {bombyPossessedId === userId && (
-            <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, opacity: 0.3, backgroundImage: `url(${getBombyImageUrl(bombyType)})`, backgroundSize: 'cover', backgroundPosition: 'center', backgroundRepeat: 'no-repeat', pointerEvents: 'none', zIndex: 0 }} />
-          )}
-          
-          <div style={{ position: 'relative', zIndex: 1 }}>
-            <h3 style={{ margin: '0 0 10px 0', fontSize: '1.1rem', color: '#2f3542', fontWeight: '800' }}>
-              👤 {me?.name || 'あなた'} {bombyPossessedId === userId && <span title="貧乏神が憑依中！">{getBombyIcon(bombyType)}</span>}
-            </h3>
-            <p style={{ margin: '5px 0', color: (me?.money || 0) < 0 ? '#e74c3c' : '#27ae60', fontWeight: '800', fontSize: '1.3rem' }}>💰 {me?.money?.toLocaleString() ?? START_MONEY.toLocaleString()}円</p>
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.9rem', color: '#747d8c', marginTop: '10px', background: 'rgba(241, 242, 246, 0.8)', padding: '6px 10px', borderRadius: '8px', fontWeight: 'bold' }}>
-              <span>🏠 {me?.properties?.length || 0}件</span>
-              <span>🎒 {me?.items?.length || 0}/3 個</span>
-            </div>
-          </div>
-        </div>
-
-        <div 
-          onClick={() => { if (opponent) setDetailPlayer('opponent') }} 
-          style={{ flex: 1, position: 'relative', overflow: 'hidden', background: '#ffffff', padding: '20px 15px', borderRadius: '16px', textAlign: 'center', border: !isMyTurn && opponent ? '4px solid #ff4757' : '4px solid #dcdde1', opacity: opponent ? 1 : 0.6, boxShadow: !isMyTurn && opponent ? '0 8px 0 rgba(255,71,87,0.3)' : '0 6px 0 rgba(0,0,0,0.1)', transform: !isMyTurn && opponent ? 'translateY(-4px)' : 'none', transition: 'all 0.2s', cursor: opponent ? 'pointer' : 'default' }}
-        >
-          {bombyPossessedId === opponentId && opponent && (
-            <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, opacity: 0.3, backgroundImage: `url(${getBombyImageUrl(bombyType)})`, backgroundSize: 'cover', backgroundPosition: 'center', backgroundRepeat: 'no-repeat', pointerEvents: 'none', zIndex: 0 }} />
-          )}
-
-          <div style={{ position: 'relative', zIndex: 1 }}>
-            <h3 style={{ margin: '0 0 10px 0', fontSize: '1.1rem', color: '#2f3542', fontWeight: '800' }}>
-              {opponent ? `👤 ${opponent.name}` : '👤 あいて'} {bombyPossessedId === opponentId && <span title="貧乏神が憑依中！">{getBombyIcon(bombyType)}</span>}
-            </h3>
-            {!opponent ? (
-              <div style={{ margin: '15px 0' }}><QRCodeSVG value={inviteUrl} size={90} /></div>
-            ) : (
-              <>
-                <p style={{ margin: '5px 0', color: (opponent?.money || 0) < 0 ? '#e74c3c' : '#27ae60', fontWeight: '800', fontSize: '1.3rem' }}>💰 {opponent?.money?.toLocaleString() ?? START_MONEY.toLocaleString()}円</p>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.9rem', color: '#747d8c', marginTop: '10px', background: 'rgba(241, 242, 246, 0.8)', padding: '6px 10px', borderRadius: '8px', fontWeight: 'bold' }}>
-                  <span>🏠 {opponent?.properties?.length || 0}件</span>
-                  <span>🎒 {opponent?.items?.length || 0}/3 個</span>
+          {slides.map((sl) => {
+            const p = sl.player;
+            const possessed = !!p && bombyPossessedId === sl.uid;
+            const total = (p?.money || 0) + (p?.properties || []).reduce((sum: number, x: Property) => sum + x.price, 0);
+            return (
+              <div key={sl.key} style={{ minWidth: '100%', boxSizing: 'border-box', padding: '14px 16px 18px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+                  <span style={{ fontWeight: 900, fontSize: '1.15rem', color: sl.dark }}>{sl.label}</span>
+                  {sl.isTurn && (
+                    <span style={{ background: '#ff4757', color: '#fff', fontWeight: 900, fontSize: '0.75rem', padding: '4px 10px', borderRadius: 999 }}>🎲 代表者</span>
+                  )}
                 </div>
-              </>
-            )}
-          </div>
+                {p ? (
+                  <TrainIllustration color={sl.color} darkColor={sl.dark} bombyImage={possessed ? getBombyImageUrl(bombyType) : null} bombyType={bombyType} />
+                ) : (
+                  <div style={{ height: 150, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+                    <QRCodeSVG value={inviteUrl} size={110} />
+                    <span style={{ fontSize: '0.8rem', fontWeight: 800, color: '#7f8c8d' }}>相手のスマホで読み取って参加</span>
+                  </div>
+                )}
+                {p && (
+                  <div style={{ background: '#fff', borderRadius: 14, padding: '10px 14px', marginTop: 6, boxShadow: '0 2px 0 rgba(0,0,0,0.05)' }}>
+                    <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between' }}>
+                      <span style={{ fontWeight: 900, fontSize: '1.35rem', color: (p.money || 0) < 0 ? '#e74c3c' : '#27ae60' }}>💰 {(p.money ?? START_MONEY).toLocaleString()}円</span>
+                      <span style={{ fontWeight: 800, fontSize: '0.85rem', color: '#636e72' }}>総資産 {total.toLocaleString()}円</span>
+                    </div>
+                    <div style={{ display: 'flex', gap: 12, marginTop: 6, fontSize: '0.9rem', fontWeight: 800, color: '#57606f', flexWrap: 'wrap' }}>
+                      <span>🏠 {p.properties?.length || 0}件</span>
+                      <span>🎒 {p.items?.length || 0}/3</span>
+                      {possessed && <span style={{ color: '#8e44ad' }}>{getBombyIcon(bombyType)} 貧乏神が憑いている</span>}
+                    </div>
+                    <button onClick={() => setDetailPlayer(sl.key)} style={{ marginTop: 8, width: '100%', border: 'none', borderRadius: 999, padding: '8px 0', background: '#f1f2f6', color: '#2f3542', fontWeight: 800, fontSize: '0.85rem', cursor: 'pointer' }}>
+                      📋 アイテム・物件をくわしく見る
+                    </button>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </motion.div>
+        {/* どちらを見ているか（タップでも切り替え） */}
+        <div style={{ display: 'flex', justifyContent: 'center', gap: 8, paddingBottom: 12 }}>
+          {slides.map((sl, i) => (
+            <button
+              key={sl.key}
+              onClick={() => setSlide(i)}
+              aria-label={`${sl.label}を見る`}
+              style={{ width: slide === i ? 22 : 9, height: 9, borderRadius: 999, border: 'none', background: slide === i ? sl.color : '#c8d6e5', transition: 'all 0.2s', cursor: 'pointer', padding: 0 }}
+            />
+          ))}
         </div>
       </div>
     </>
@@ -367,9 +392,15 @@ export const MissionPhaseUI: React.FC<{
   destinationNotes: string[];
   onAddNote: (note: string) => void;
   onRemoveNote: (note: string) => void;
+  /** 選んだ結果（true 成功／false 失敗／null まだ） */
+  myResult: boolean | null; opResult: boolean | null;
+  onSetResult: (who: 'me' | 'op', success: boolean) => void;
   myMission: Mission | undefined; opponentMission: Mission | undefined; opponentName: string;
   isMyTurn: boolean; onEndMission: (mySuccess: boolean, opSuccess: boolean) => void;
-}> = ({ roomId, timerData, currentStationName, stayTime, squareType, destinationNotes, onAddNote, onRemoveNote, myMission, opponentMission, opponentName, isMyTurn, onEndMission }) => {
+}> = ({ roomId, timerData, currentStationName, stayTime, squareType, destinationNotes, onAddNote, onRemoveNote, myResult, opResult, onSetResult, myMission, opponentMission, opponentName, isMyTurn, onEndMission }) => {
+  // 協力ミッション（2 人で同じミッション）は 1 枚のカード・1 つの結果にする
+  const shared = !!myMission && !!opponentMission && myMission.type === 'green' && myMission.id === opponentMission.id;
+  const ready = myResult !== null && opResult !== null;
   const getMissionColor = (type?: string) => {
     if (type === 'blue') return { bg: '#e3f2fd', border: '#64b5f6', text: '#1976d2', label: '🔵 青マス' };
     if (type === 'red') return { bg: '#ffebee', border: '#e57373', text: '#d32f2f', label: '🔴 赤マス' };
@@ -426,42 +457,33 @@ export const MissionPhaseUI: React.FC<{
         <div style={{ display: 'flex', flexDirection: 'column', gap: '15px', marginBottom: '25px' }}>
           {myMission && (
             <div style={{ background: currentSquare.bg, border: `3px solid ${currentSquare.border}`, padding: '15px', borderRadius: '12px', textAlign: 'left', boxShadow: '0 4px 0 rgba(0,0,0,0.05)' }}>
-              <div style={{ fontSize: '0.9rem', fontWeight: '800', color: currentSquare.text, marginBottom: '6px' }}>👤 あなたのミッション</div>
+              <div style={{ fontSize: '0.9rem', fontWeight: '800', color: currentSquare.text, marginBottom: '6px' }}>{shared ? '👥 2人の協力ミッション' : '👤 あなたのミッション'}</div>
               <div style={{ fontWeight: '800', fontSize: '1.1rem', marginBottom: '6px' }}>{myMission.name}</div>
               <p style={{ margin: '0', fontSize: '0.95rem', fontWeight: 'bold' }}>{myMission.description}</p>
-              {/* 🔑 ここでバッジを表示 */}
               {renderRewardBadge(myMission, squareType)}
+              <ResultPicker value={myResult} onChange={(v) => onSetResult('me', v)} />
             </div>
           )}
-          {opponentMission && (
-            <div style={{ background: currentSquare.bg, border: `3px solid ${currentSquare.border}`, padding: '15px', borderRadius: '12px', textAlign: 'left', opacity: 0.9, boxShadow: '0 4px 0 rgba(0,0,0,0.05)' }}>
+          {opponentMission && !shared && (
+            <div style={{ background: currentSquare.bg, border: `3px solid ${currentSquare.border}`, padding: '15px', borderRadius: '12px', textAlign: 'left', opacity: 0.95, boxShadow: '0 4px 0 rgba(0,0,0,0.05)' }}>
               <div style={{ fontSize: '0.9rem', fontWeight: '800', color: currentSquare.text, marginBottom: '6px' }}>👤 {opponentName}のミッション</div>
               <div style={{ fontWeight: '800', fontSize: '1.1rem', marginBottom: '6px' }}>{opponentMission.name}</div>
               <p style={{ margin: '0', fontSize: '0.95rem', fontWeight: 'bold' }}>{opponentMission.description}</p>
-              {/* 🔑 ここでバッジを表示 */}
               {renderRewardBadge(opponentMission, squareType)}
+              <ResultPicker value={opResult} onChange={(v) => onSetResult('op', v)} />
             </div>
           )}
         </div>
 
+        {/* 結果の確定は代表者だけ。成功・失敗は 2 人とも選べる（2 台で同じ表示） */}
         {isMyTurn ? (
-          <div style={{ background: '#fff', padding: '20px', borderRadius: '16px', border: '3px solid #ccc', boxShadow: '0 6px 0 rgba(0,0,0,0.1)', textAlign: 'left' }}>
-            <p style={{ margin: '0 0 15px 0', fontWeight: '800', fontSize: '1.1rem', color: '#2c3e50', textAlign: 'center' }}>📝 ミッション結果を入力</p>
-            
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
-              <button className="btn-pop btn-green" onClick={() => onEndMission(true, true)}>🎉 2人とも成功！</button>
-              {/* 協力ミッション（黄マスで出た場合も）は 2 人で 1 つの結果なので「どちらかだけ」は選べない */}
-              {squareType !== 'green' && myMission?.type !== 'green' && (
-                <div style={{ display: 'flex', gap: '15px' }}>
-                  <button className="btn-pop btn-blue" onClick={() => onEndMission(true, false)}>👍 あなたのみ</button>
-                  <button className="btn-pop btn-yellow" onClick={() => onEndMission(false, true)}>👎 相手のみ</button>
-                </div>
-              )}
-              <button className="btn-pop btn-gray" onClick={() => onEndMission(false, false)}>😭 2人とも失敗...</button>
-            </div>
-          </div>
+          <button className="btn-pop btn-green" disabled={!ready} onClick={() => onEndMission(!!myResult, !!opResult)}>
+            {ready ? '✅ 結果を確定する' : '⭕／❌ を選んでから確定してね'}
+          </button>
         ) : (
-          <p style={{ color: '#747d8c', fontWeight: '800', fontSize: '1.1rem' }}>⏳ 代表者が結果を入力しています...</p>
+          <p style={{ color: '#747d8c', fontWeight: '800', fontSize: '1rem', textAlign: 'center', margin: 0 }}>
+            {ready ? '⏳ 代表者が確定するのを待っています...' : '⭕／❌ を選んでね（確定は代表者）'}
+          </p>
         )}
       </div>
     </>
@@ -919,6 +941,27 @@ const DestinationMemo: React.FC<{
       <DestinationInput value={draft} onChange={setDraft} placeholder="例: 東口のカフェ（共有した場所も貼り付けOK）" stationName={stationName} />
       <button className="btn-pop btn-blue" onClick={add} disabled={!draft.trim()} style={{ marginTop: '10px' }}>
         ＋ メモに追加
+      </button>
+    </div>
+  );
+};
+
+/** ミッションの成功・失敗を選ぶボタン */
+const ResultPicker: React.FC<{ value: boolean | null; onChange: (success: boolean) => void }> = ({ value, onChange }) => {
+  const base: React.CSSProperties = { flex: 1, borderRadius: '12px', padding: '10px 0', fontWeight: 900, fontSize: '1rem', cursor: 'pointer', transition: 'all 0.1s' };
+  return (
+    <div style={{ display: 'flex', gap: '10px', marginTop: '12px' }}>
+      <button
+        onClick={() => onChange(true)}
+        style={{ ...base, border: '3px solid #2ecc71', background: value === true ? '#2ecc71' : '#fff', color: value === true ? '#fff' : '#27ae60', boxShadow: value === true ? '0 3px 0 #1e8449' : 'none' }}
+      >
+        ⭕ 成功
+      </button>
+      <button
+        onClick={() => onChange(false)}
+        style={{ ...base, border: '3px solid #e74c3c', background: value === false ? '#e74c3c' : '#fff', color: value === false ? '#fff' : '#c0392b', boxShadow: value === false ? '0 3px 0 #922b21' : 'none' }}
+      >
+        ❌ 失敗
       </button>
     </div>
   );

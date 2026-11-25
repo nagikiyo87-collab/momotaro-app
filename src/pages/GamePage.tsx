@@ -337,6 +337,12 @@ export const GamePage: React.FC<Props> = ({ roomId, userId }) => {
                         destinationNotes={destinationNotes}
                         onAddNote={actions.handleAddDestinationNote}
                         onRemoveNote={actions.handleRemoveDestinationNote}
+                        myResult={roomData?.missionResults?.[userId] ?? null}
+                        opResult={opponentId ? roomData?.missionResults?.[opponentId] ?? null : null}
+                        onSetResult={(who, success) => {
+                          const shared = myMission?.type === 'green' && myMission?.id === opponentMission?.id;
+                          actions.handleSetMissionResult(who === 'me' ? userId : opponentId!, success, shared);
+                        }}
                         myMission={myMission} 
                         opponentMission={opponentMission} 
                         opponentName={opponent?.name || '相手'} 
