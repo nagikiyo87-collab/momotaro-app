@@ -495,7 +495,8 @@ export const MissionPhaseUI: React.FC<{
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
               <button className="btn-pop btn-green" onClick={() => onEndMission(true, true, reachedFirstDest)}>🎉 2人とも成功！</button>
-              {squareType !== 'green' && (
+              {/* 協力ミッション（黄マスで出た場合も）は 2 人で 1 つの結果なので「どちらかだけ」は選べない */}
+              {squareType !== 'green' && myMission?.type !== 'green' && (
                 <div style={{ display: 'flex', gap: '15px' }}>
                   <button className="btn-pop btn-blue" onClick={() => onEndMission(true, false, reachedFirstDest)}>👍 あなたのみ</button>
                   <button className="btn-pop btn-yellow" onClick={() => onEndMission(false, true, reachedFirstDest)}>👎 相手のみ</button>

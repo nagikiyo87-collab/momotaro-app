@@ -290,9 +290,31 @@ export const ITEMS: Item[] = [
   { id: 'i_time_extend', name: '時間増加カード', description: 'ミッション中いつでも使用可能。制限時間を延長できる', type: 'support', rarity: 3 },
 
   // 防御・回避系
-  { id: 'i_dice_plus2', name: 'ダイス+2カード', description: 'サイコロ勝負の際、自分の出目に+2する', type: 'defense', rarity: 2 },
-  { id: 'i_dice_minus2', name: 'ダイス-2カード', description: 'サイコロ勝負の際、相手の出目を-2する', type: 'defense', rarity: 2 },
-  { id: 'i_shield', name: '防御シールド', description: '相手からのカード攻撃やなすりつけを1回無効化する', type: 'defense', rarity: 2 },
+  { id: 'i_dice_plus2', name: 'ダイス+2カード', description: 'サイコロを振る前に使うと、移動の出目が+2される', type: 'defense', rarity: 2 },
+  { id: 'i_shield', name: '防御シールド', description: '持っているだけで、相手の妨害カード（なすりつけ含む）を1回だけ自動で無効化する', type: 'defense', rarity: 2 },
   { id: 'i_mission_pass', name: 'ミッションフリーパス', description: '嫌なミッションを無条件で「クリア扱い」としてパスできる', type: 'defense', rarity: 1 },
   { id: 'i_debt_clear', name: '徳政令カード', description: '自分の借金（マイナス所持金）をゼロにする', type: 'defense', rarity: 2 },
 ];
+// ==========================================
+// 🎲 アイテムのルール
+// ==========================================
+/** 防御シールド：使うカードではなく、持っているだけで自動発動する */
+export const SHIELD_ID = 'i_shield';
+/** 持っているだけで効くカード（「使う」ボタンを出さない） */
+export const PASSIVE_ITEMS = [SHIELD_ID];
+/** 相手への妨害カード（防御シールドで無効化される） */
+export const isAttackItem = (id: string) => ITEMS.find((i) => i.id === id)?.type === 'attack';
+
+/**
+ * アイテムを「出やすさ（★の数）」に比例した確率で 1 つ選び、その位置を返す。
+ * ★3 は ★1 の 3 倍出やすい。rand はシミュレーターから乱数を差し替えるため
+ */
+export const pickItemIndexByRarity = (pool: Item[], rand: () => number = Math.random) => {
+  const total = pool.reduce((s, it) => s + it.rarity, 0);
+  let r = rand() * total;
+  for (let i = 0; i < pool.length; i++) {
+    r -= pool[i].rarity;
+    if (r < 0) return i;
+  }
+  return pool.length - 1;
+};

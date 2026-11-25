@@ -1,7 +1,7 @@
 import React, { useState, useEffect, lazy, Suspense } from 'react';
 import { useGameSync } from '../hooks/useGameSync';
 import { useTurnActions } from '../hooks/useTurnActions';
-import { STATIONS, STATION_PROPERTIES, MISSIONS, ITEMS } from '../data/gameData'; 
+import { STATIONS, STATION_PROPERTIES, MISSIONS, ITEMS, PASSIVE_ITEMS } from '../data/gameData'; 
 import { RuleModal } from '../components/RuleModal';
 import { GameHeader, PlayerCards, GameMapView, BottomNav, AnimatedRoulette, SeasonalBackground, DestinationPhaseUI, MissionPhaseUI, SpendingPhaseUI, BiddingPhaseUI, ResultPhaseUI } from '../components/GameUI';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -107,7 +107,8 @@ export const GamePage: React.FC<Props> = ({ roomId, userId }) => {
   const MISSION_ITEMS = ['i_mission_swap', 'i_mission_share', 'i_mission_reroll', 'i_reward_double', 'i_mission_pass', 'i_time_extend'];
   const BOMBY_ITEMS = ['i_bomby_pass'];
 
-  const dicePhaseItems = myItems.filter(id => !MISSION_ITEMS.includes(id) && !BOMBY_ITEMS.includes(id));
+  // 持っているだけで効くカード（防御シールド）と、廃止したカード（ダイス-2 など）には「使う」ボタンを出さない
+  const dicePhaseItems = myItems.filter(id => !MISSION_ITEMS.includes(id) && !BOMBY_ITEMS.includes(id) && !PASSIVE_ITEMS.includes(id) && ITEMS.some(i => i.id === id));
   const bombyPhaseItems = roomData?.bombyPossessedId === userId ? myItems.filter(id => BOMBY_ITEMS.includes(id)) : [];
   const availableDiceItems = [...dicePhaseItems, ...bombyPhaseItems];
 

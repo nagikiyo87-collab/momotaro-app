@@ -14,12 +14,12 @@ import {
 } from './support';
 
 import {
-  executeDicePlus2, executeDiceMinus2, executeShield,
+  executeDicePlus2,
   executeMissionPass, executeDebtClear
 } from './defense';
 
 // ==========================================
-// 📖 アイテム辞書（全20種に変更）
+// 📖 アイテム辞書（全19種。ダイス-2は廃止（2026-11-25））
 // ==========================================
 export const ITEM_REGISTRY: Record<string, ItemFunction> = {
   // --- 妨害・逆転系 ---
@@ -43,8 +43,7 @@ export const ITEM_REGISTRY: Record<string, ItemFunction> = {
 
   // --- 防御・回避系 ---
   'i_dice_plus2': executeDicePlus2,
-  'i_dice_minus2': executeDiceMinus2,
-  'i_shield': executeShield,
+  // 防御シールドは使うカードではなく、持っているだけで自動発動（useTurnActions の handleUseItem で判定）
   'i_mission_pass': executeMissionPass,
   'i_debt_clear': executeDebtClear,
 };

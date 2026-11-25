@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { doc, updateDoc } from 'firebase/firestore';
 import { db } from '../firebase';
-import { STATIONS, MISSIONS, ITEMS, type Mission, type Property } from '../data/gameData';
+import { STATIONS, MISSIONS, ITEMS, SHIELD_ID, isAttackItem, pickItemIndexByRarity, type Mission, type Property } from '../data/gameData';
 import { useModal } from '../contexts/ModalContext';
 import { ITEM_REGISTRY } from '../game/items/itemRegistry';
 import type { ItemContext } from '../game/items/types';
@@ -135,6 +135,21 @@ export const useTurnActions = (
     const confirmUse = await showConfirm(`アイテム「${ITEMS.find(i => i.id === itemId)?.name}」を使いますか？`);
     if (!confirmUse) return;
 
+    // 相手が防御シールドを持っていれば、妨害カードは自動で無効化される（使ったカードとシールドの両方が消える）
+    const opItemsNow: string[] = opponent?.items || [];
+    if (isAttackItem(itemId) && opItemsNow.includes(SHIELD_ID)) {
+      const myNewItems = [...(me?.items || [])];
+      myNewItems.splice(index, 1);
+      const opNewItems = [...opItemsNow];
+      opNewItems.splice(opNewItems.indexOf(SHIELD_ID), 1);
+      updateDoc(doc(db, 'rooms', roomId), {
+        [`players.${userId}.items`]: myNewItems,
+        [`players.${opponentId}.items`]: opNewItems,
+      }).catch(console.error);
+      await showAlert(`🛡️ 相手の「防御シールド」が自動で発動！\n「${ITEMS.find(i => i.id === itemId)?.name}」は無効化されました。\n（使ったカードと相手のシールドは、どちらもなくなります）`);
+      return;
+    }
+
     const ctx: ItemContext = { userId, opponentId, roomId, me, opponent, roomData, modal };
     const result = await itemFunc(ctx);
     if (!result) return; 
@@ -267,13 +282,13 @@ export const useTurnActions = (
 
     if (roomData?.squareType === 'yellow') {
       if (actualMySuccess) {
-        const idx = Math.floor(Math.random() * availableItems.length);
+        const idx = pickItemIndexByRarity(availableItems); // 出やすさ（★）に比例
         const randomItem = availableItems[idx]; availableItems.splice(idx, 1); myNewItems.push(randomItem.id); 
         myItemMsg += `\n🎁 アイテムマス効果:「${randomItem.name}」をGET！`; 
         if (myNewItems.length > 3) myItemMsg += `\n⚠️ カバンがいっぱいです！次へ進む前に1つ捨ててください。`;
       }
       if (opponentSuccess) {
-        const idx = Math.floor(Math.random() * availableItems.length);
+        const idx = pickItemIndexByRarity(availableItems);
         const randomItem = availableItems[idx]; availableItems.splice(idx, 1); opponentNewItems.push(randomItem.id); 
         opponentItemMsg += `\n🎁 アイテムマス効果:「${randomItem.name}」をGET！`; 
         if (opponentNewItems.length > 3) opponentItemMsg += `\n⚠️ 相手のカバンがいっぱいになりました。`;
