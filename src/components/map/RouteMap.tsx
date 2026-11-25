@@ -95,7 +95,7 @@ export const RouteMap = ({ sharedPosition, squares, maxMove, myPropertyIds, opPr
       {/* 見出しと凡例 */}
       <div style={{ textAlign: 'center', marginBottom: 10 }}>
         <span style={{ background: '#fff', padding: '8px 16px', borderRadius: 999, fontWeight: 900, color: '#27ae60', border: '3px solid #27ae60', fontSize: '1rem', boxShadow: '0 4px 0 rgba(39,174,96,0.3)' }}>
-          📍 {STATIONS[sharedPosition]}　ゴールまであと {goal - sharedPosition} 駅
+          📍 {STATIONS[sharedPosition]}<span style={{ marginLeft: 10 }}>ゴールまであと {goal - sharedPosition} 駅</span>
         </span>
       </div>
       <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: '4px 10px', margin: '12px 0 4px', fontSize: '0.75rem', fontWeight: 800, color: '#2c3e50' }}>
