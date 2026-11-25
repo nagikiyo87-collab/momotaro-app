@@ -37,6 +37,7 @@ type Scenario = {
   allowance?: number;
   firstDestMiss?: number; // 1 番目の目的地に遅れる確率（ペナルティ廃止後は 0）
   overheadMin?: number; // 1 ターンの操作の時間（分）。ルーレット・目的地フェーズ廃止後は短い
+  stayTimes?: { min: number; w: number }[]; // 滞在時間と出やすさ（既定は 30/45/60 分が同じ確率）
   // 貧乏神の逆転要素：憑かれている人が総資産で gap 円以上負けているとき、prob の確率で
   // jump＝相手に乗り移る（悪行なし）／ gift＝改心してお金をくれる（悪行の代わりに +gift 円）
   bombyComeback?: { gap: number; prob: number; kind: 'jump' | 'gift'; gift?: number };
@@ -151,6 +152,11 @@ const SCENARIOS: Scenario[] = [
     };
     return [
       V4,
+      // ---- 2026-11-26：所持金 5,000 円と、滞在時間の案
+      { ...V4, id: 'v5_money5000', label: '【案】所持金5,000円（滞在は今のまま 30/45/60 分）', startMoney: 5000 },
+      { ...V4, id: 'v5_stay_even', label: '【案】所持金5,000円＋滞在 30/40/50/60 分が同じ確率', startMoney: 5000, stayTimes: [{ min: 30, w: 25 }, { min: 40, w: 25 }, { min: 50, w: 25 }, { min: 60, w: 25 }] },
+      { ...V4, id: 'v5_stay_3535', label: '【案】所持金5,000円＋滞在 30・40 分 各35%、50・60 分 各15%', startMoney: 5000, stayTimes: [{ min: 30, w: 35 }, { min: 40, w: 35 }, { min: 50, w: 15 }, { min: 60, w: 15 }] },
+      { ...V4, id: 'v5_stay_4030', label: '【案】所持金5,000円＋滞在 30分40%・40分30%・50分20%・60分10%', startMoney: 5000, stayTimes: [{ min: 30, w: 40 }, { min: 40, w: 30 }, { min: 50, w: 20 }, { min: 60, w: 10 }] },
       { ...V4, id: 'v4_mission_easy', label: '【v4】ミッション成功率 高め（95/80/60%）', successRate: [0.95, 0.8, 0.6] as [number, number, number] },
       { ...V4, id: 'v4_mission_hard', label: '【v4】ミッション成功率 低め（60/40/20%）', successRate: [0.6, 0.4, 0.2] as [number, number, number] },
       { ...V4, id: 'v4_bid_aggressive', label: '【v4】入札 強気（上限の90〜100%・必ず入札）', bidMin: 0.9, bidMax: 1.0, skipBid: 0 },
@@ -399,7 +405,18 @@ const playGame = (sc: Scenario): GameResult => {
     minutesAlt += ALT_WAIT_MIN + (pos - from) * ALT_MIN_PER_STATION;
 
     // ---- ルーレット（滞在時間とマス）
-    const stay = pick([30, 45, 60]);
+    let stay = pick([30, 45, 60]);
+    if (sc.stayTimes) {
+      const total = sc.stayTimes.reduce((a, b) => a + b.w, 0);
+      let r = rnd() * total;
+      for (const t of sc.stayTimes) {
+        r -= t.w;
+        if (r < 0) {
+          stay = t.min;
+          break;
+        }
+      }
+    }
     minutes += stay + (sc.overheadMin ?? OVERHEAD_MIN_PER_TURN);
     minutesAlt += stay + (sc.overheadMin ?? OVERHEAD_MIN_PER_TURN);
     const square = pick(['blue', 'red', 'green', 'yellow'] as const);

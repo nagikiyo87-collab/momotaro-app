@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { doc, updateDoc, deleteField, arrayUnion, arrayRemove } from 'firebase/firestore';
 import { db } from '../firebase';
-import { STAY_TIMES, getStationSquares, STATIONS, MISSIONS, ITEMS, SHIELD_ID, isAttackItem, pickItemIndexByRarity, SETTLEMENT_SEASONS, DEBT_INTEREST_RATE, DEBT_INTEREST_SEASON, BOMBY_REFORM, type Mission, type Property } from '../data/gameData';
+import { pickStayTime, getStationSquares, STATIONS, MISSIONS, ITEMS, SHIELD_ID, isAttackItem, pickItemIndexByRarity, SETTLEMENT_SEASONS, DEBT_INTEREST_RATE, DEBT_INTEREST_SEASON, BOMBY_REFORM, type Mission, type Property } from '../data/gameData';
 import { useModal } from '../contexts/ModalContext';
 import { ITEM_REGISTRY } from '../game/items/itemRegistry';
 import type { ItemContext } from '../game/items/types';
@@ -161,12 +161,12 @@ export const useTurnActions = (
   /**
    * 駅に着いたときの準備（以前のルーレットの代わり。2026-11-25）
    * - マスの色は駅ごとに決まっている（getStationSquares。マップで事前に見える）
-   * - 滞在時間は 30／45／60 分からランダム（出方は以前のルーレットと同じ）
+   * - 滞在時間は 30／40／50／60 分から。30・40 分が出やすい
    * - その色のミッションを 2 人に配る（協力マスは同じミッション）
    */
   const arrivalUpdates = (position: number) => {
     const squareType = getStationSquares(roomId)[position];
-    const stayTime = STAY_TIMES[Math.floor(Math.random() * STAY_TIMES.length)];
+    const stayTime = pickStayTime(); // 30・40 分が出やすい（STAY_TIME_WEIGHTS）
     const targetMissions = squareType === 'yellow' ? MISSIONS : MISSIONS.filter(m => m.type === squareType);
 
     let myMissionObj: Mission; let opponentMissionObj: Mission;

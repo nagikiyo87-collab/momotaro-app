@@ -322,8 +322,11 @@ export const pickItemIndexByRarity = (pool: Item[], rand: () => number = Math.ra
 // ==========================================
 // 💰 お金のルール（2026-11-25 シミュレーション結果を受けて変更）
 // ==========================================
-/** 最初の所持金（以前は 3,000 円。7 割の人が借金で終わっていた） */
-export const START_MONEY = 10000;
+/**
+ * 最初の所持金。3,000 円だと 7 割の人が借金で終わり、10,000 円だと借金がほぼ起きず緊張感がなかった。
+ * 5,000 円（2026-11-26）で、一度でも借金になる人は約 6%（シミュレーション）
+ */
+export const START_MONEY = 5000;
 /** 決算（物件の収益を受け取る）季節。年 2 回 */
 export const SETTLEMENT_SEASONS = ['summer', 'winter'];
 /** 借金の利息。冬の決算時だけ、借金の 10% */
@@ -371,8 +374,26 @@ export const SQUARE_STYLE: Record<SquareType, { label: string; color: string; bg
   yellow: { label: 'アイテムマス', color: '#f9a825', bg: '#fffde7' },
 };
 
-/** 滞在時間の候補（ランダムで 1 つ。出方は以前のルーレットと同じ） */
-export const STAY_TIMES = [30, 45, 60];
+/**
+ * 滞在時間の候補と出やすさ（2026-11-26 変更。以前は 30・45・60 分が同じ確率）。
+ * 30・40 分を出やすくして、1 ゲームを約 30 分短くする（シミュレーション）
+ */
+export const STAY_TIME_WEIGHTS = [
+  { minutes: 30, weight: 35 },
+  { minutes: 40, weight: 35 },
+  { minutes: 50, weight: 15 },
+  { minutes: 60, weight: 15 },
+];
+/** 滞在時間を出やすさに従って 1 つ選ぶ */
+export const pickStayTime = (rand: () => number = Math.random) => {
+  const total = STAY_TIME_WEIGHTS.reduce((s, t) => s + t.weight, 0);
+  let r = rand() * total;
+  for (const t of STAY_TIME_WEIGHTS) {
+    r -= t.weight;
+    if (r < 0) return t.minutes;
+  }
+  return STAY_TIME_WEIGHTS[0].minutes;
+};
 
 /**
  * ご褒美ランクの基準（総資産の差額）。2026-11-25 に引き下げ（以前は 30,000／10,000／3,000）。
