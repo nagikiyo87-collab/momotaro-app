@@ -32,6 +32,10 @@ type Scenario = {
   settleSeasons?: number[]; // 決算する季節（0 春 1 夏 2 秋 3 冬）
   twoDiceFromHalf?: boolean; // 折り返し（全体の半分）を過ぎたらサイコロ 2 個
   chooseTwoInSecondHalf?: number; // 後半は 1 個か 2 個を選べる：2 個を選ぶ確率
+  // リアル出費の扱い：deduct＝全額引く（現状）／none＝引かない／allowance＝おこづかい（この額まで引かない）／memory＝引くが同額を「思い出」として資産に数える
+  spendMode?: 'deduct' | 'none' | 'allowance' | 'memory';
+  allowance?: number;
+  firstDestMiss?: number; // 1 番目の目的地に遅れる確率（ペナルティ廃止後は 0）
   // 貧乏神の逆転要素：憑かれている人が総資産で gap 円以上負けているとき、prob の確率で
   // jump＝相手に乗り移る（悪行なし）／ gift＝改心してお金をくれる（悪行の代わりに +gift 円）
   bombyComeback?: { gap: number; prob: number; kind: 'jump' | 'gift'; gift?: number };
@@ -105,6 +109,29 @@ const SCENARIOS: Scenario[] = [
     chooseTwoInSecondHalf: 0.5,
     bombyComeback: { gap: 3000, prob: 0.25, kind: 'gift', gift: 3000 },
   },
+  // ---- v3：ルーレット廃止・到達ペナルティ廃止（2026-11-25）と、リアル出費の扱いの案
+  ...(() => {
+    const V3: Scenario = {
+      ...BASE,
+      id: 'v3',
+      label: '【v3 現状】v2＋到達ペナルティなし（出費は全額引く・平均500円）',
+      startMoney: 10000,
+      interestRate: 0.1,
+      interestOnlyWinter: true,
+      settleSeasons: [1, 3],
+      chooseTwoInSecondHalf: 0.5,
+      bombyComeback: { gap: 3000, prob: 0.25, kind: 'gift', gift: 3000 },
+      firstDestMiss: 0,
+    };
+    return [
+      V3,
+      { ...V3, id: 'v3_deduct_1000', label: '【v3】出費は全額引く・平均1,000円使う', spendMean: 1000 },
+      { ...V3, id: 'v3_none', label: '【案A】出費は引かない（平均1,000円使う）', spendMode: 'none' as const, spendMean: 1000 },
+      { ...V3, id: 'v3_allowance', label: '【案B】おこづかい制：1駅1,000円まで引かない（平均1,000円使う）', spendMode: 'allowance' as const, allowance: 1000, spendMean: 1000 },
+      { ...V3, id: 'v3_memory', label: '【案C】思い出資産：引くが同額を資産に（平均1,000円使う）', spendMode: 'memory' as const, spendMean: 1000 },
+      { ...V3, id: 'v3_none_3000', label: '【案A2】出費は引かない＋最初の所持金3,000円', spendMode: 'none' as const, spendMean: 1000, startMoney: 3000 },
+    ];
+  })(),
   {
     ...BASE,
     id: 'p_combo_half_bomby',
@@ -164,6 +191,7 @@ type Player = {
   kingHits: number;
   itemsUsed: string[];
   wasInDebt: boolean;
+  memories: number; // 思い出資産（spendMode = memory のとき）
 };
 
 const newPlayer = (startMoney = 3000): Player => ({
@@ -182,6 +210,7 @@ const newPlayer = (startMoney = 3000): Player => ({
   kingHits: 0,
   itemsUsed: [],
   wasInDebt: false,
+  memories: 0,
 });
 
 // アプリと同じ：所持金がマイナスなら、安い物件から元値の 50% で売って補う
@@ -200,7 +229,7 @@ const applyMoney = (p: Player, change: number, bucket: keyof Player) => {
   if (p.money < 0) p.wasInDebt = true;
 };
 
-const assets = (p: Player) => p.money + p.props.reduce((s, x) => s + x.price, 0);
+const assets = (p: Player) => p.money + p.memories + p.props.reduce((s, x) => s + x.price, 0);
 const income = (p: Player) => p.props.reduce((s, x) => s + Math.floor(x.price * (x.rate / 100)), 0);
 
 const rank = (diff: number) => (diff >= 30000 ? 'S' : diff >= 10000 ? 'A' : diff >= 3000 ? 'B' : 'C');
@@ -406,7 +435,7 @@ const playGame = (sc: Scenario): GameResult => {
         if (mySuccess) gain(r);
         if (opSuccess) gain(o);
       }
-      if (rnd() < FIRST_DEST_MISS_RATE) rc -= 1000;
+      if (rnd() < (sc.firstDestMiss ?? FIRST_DEST_MISS_RATE)) rc -= 1000;
       applyMoney(r, rc, 'fromMission');
       applyMoney(o, oc, 'fromMission');
       // 貧乏神の移動（アプリと同じ）
@@ -416,7 +445,16 @@ const playGame = (sc: Scenario): GameResult => {
     }
 
     // ---- リアル出費
-    for (const p of P) applyMoney(p, -spend(sc.spendMean), 'fromSpend');
+    for (const p of P) {
+      const s = spend(sc.spendMean);
+      const mode = sc.spendMode ?? 'deduct';
+      if (mode === 'deduct') applyMoney(p, -s, 'fromSpend');
+      else if (mode === 'allowance') applyMoney(p, -Math.max(0, s - (sc.allowance ?? 1000)), 'fromSpend');
+      else if (mode === 'memory') {
+        applyMoney(p, -s, 'fromSpend');
+        p.memories += s;
+      }
+    }
 
     // ---- 入札
     const props = STATION_PROPERTIES[STATIONS[pos]] ?? [];
@@ -591,7 +629,7 @@ for (const sc of SCENARIOS) {
       p90: pct(players.map(assets), 0.9),
       negativeRate: share(players.filter((p) => assets(p) < 0).length, players.length),
     },
-    diff: { mean: Math.round(mean(games.map((g) => g.diff))), median: pct(games.map((g) => g.diff), 0.5), p90: pct(games.map((g) => g.diff), 0.9) },
+    diff: { mean: Math.round(mean(games.map((g) => g.diff))), median: pct(games.map((g) => g.diff), 0.5), p90: pct(games.map((g) => g.diff), 0.9), p35: pct(games.map((g) => g.diff), 0.35), p75: pct(games.map((g) => g.diff), 0.75), p95: pct(games.map((g) => g.diff), 0.95) },
     rankRate: Object.fromEntries(Object.entries(ranks).map(([k, v]) => [k, share(v, N)])),
     // 1 人あたり・1 ゲームあたりの平均の増減（何がお金を動かしているか）
     moneyFlowPerPlayer: {
