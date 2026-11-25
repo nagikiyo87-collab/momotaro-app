@@ -3,11 +3,12 @@ import { useGameSync } from '../hooks/useGameSync';
 import { useTurnActions } from '../hooks/useTurnActions';
 import { STATIONS, STATION_PROPERTIES, MISSIONS, ITEMS, PASSIVE_ITEMS, getStationSquares } from '../data/gameData'; 
 import { RuleModal } from '../components/RuleModal';
-import { GameHeader, PlayerCards, GameMapView, BottomNav, SeasonalBackground, StationShopList, MissionPhaseUI, SpendingPhaseUI, BiddingPhaseUI, ResultPhaseUI } from '../components/GameUI';
+import { GameHeader, PlayerCards, BottomNav, SeasonalBackground, StationShopList, MissionPhaseUI, SpendingPhaseUI, BiddingPhaseUI, ResultPhaseUI } from '../components/GameUI';
 import { motion, AnimatePresence } from 'framer-motion';
 import { doc, updateDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { QRCodeSVG } from 'qrcode.react'; 
+import { RouteMap } from '../components/map/RouteMap';
 import '../styles/index.css'; 
 
 // 3D サイコロ（three.js を含むので、ゲーム画面に入ってから別に読み込む。タイトル画面は軽いまま）
@@ -389,11 +390,14 @@ export const GamePage: React.FC<Props> = ({ roomId, userId }) => {
             )}
 
             {activeTab === 'map' && (
-              <GameMapView
-                currentStationName={currentStationName}
+              <RouteMap
                 sharedPosition={sharedPosition}
                 squares={getStationSquares(roomId)}
                 maxMove={actions.canChooseDiceCount ? 12 : 6}
+                myPropertyIds={(me?.properties || []).map((p: { id: string }) => p.id)}
+                opPropertyIds={(opponent?.properties || []).map((p: { id: string }) => p.id)}
+                myColor="#e5367a"
+                opColor="#1e6fd9"
               />
             )}
           </AnimatePresence>

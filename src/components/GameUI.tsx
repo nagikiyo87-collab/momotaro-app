@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { QRCodeSVG } from 'qrcode.react';
-import { STATIONS, ITEMS, START_MONEY, RANK_THRESHOLDS, SQUARE_STYLE, type SquareType, type Mission, type Property } from '../data/gameData';
+import { ITEMS, START_MONEY, RANK_THRESHOLDS, type Mission, type Property } from '../data/gameData';
 import { useModal } from '../contexts/ModalContext';
 import { doc, updateDoc } from 'firebase/firestore';
 import { db } from '../firebase';
@@ -66,8 +66,6 @@ export const PlayerCards: React.FC<{
 }> = ({ me, opponent, isMyTurn, userId, opponentId, bombyPossessedId, bombyType, inviteUrl }) => {
   // 以前使っていた貧乏神の画像
   const getBombyImageUrl = (type: string) => (type === 'king' ? '/bomby-king.webp' : type === 'petit' ? '/bomby-petit.webp' : '/bomby-normal.webp');
-  // 見比べ用：画像を「名前タブの背景」に置くか「電車の裏」に置くか（URL に ?bombyStyle=tab で名前タブ。既定は電車の裏）
-  const bombyImageStyle: 'tab' | 'train' = new URLSearchParams(window.location.search).get('bombyStyle') === 'tab' ? 'tab' : 'train';
   const getBombyIcon = (type: string) => type === 'king' ? '👑' : type === 'petit' ? '👼' : '😈';
 
   const [detailPlayer, setDetailPlayer] = useState<'me' | 'opponent' | null>(null);
@@ -147,9 +145,11 @@ export const PlayerCards: React.FC<{
               onClick={() => setSlide(i)}
               style={{
                 flex: 1, border: 'none', borderRadius: 999, padding: '8px 4px', fontWeight: 900, fontSize: '0.85rem', cursor: 'pointer',
-                background: slide === i ? sl.color : 'rgba(255,255,255,0.8)', color: slide === i ? '#fff' : sl.dark,
-                // パターン A：貧乏神が憑いている人の名前タブの背景に、貧乏神の画像
-                ...(bombyImageStyle === 'tab' && sl.player && bombyPossessedId === sl.uid
+                // background（まとめて指定）を使うと、選び直したときに背景の画像まで消えるので、色と画像を別々に指定する
+                backgroundColor: slide === i ? sl.color : 'rgba(255,255,255,0.8)', color: slide === i ? '#fff' : sl.dark,
+                backgroundImage: 'none',
+                // 貧乏神が憑いている人の名前タブの背景に、以前の貧乏神の画像（いつも表示）
+                ...(sl.player && bombyPossessedId === sl.uid
                   ? {
                       // 左側は文字が読めるようにタブの色、右側は画像がはっきり見えるように透明
                       backgroundImage: `linear-gradient(90deg, ${slide === i ? sl.color : '#ffffff'} 45%, ${slide === i ? sl.color + '00' : 'rgba(255,255,255,0)'} 80%), url(${getBombyImageUrl(bombyType)})`,
@@ -202,23 +202,7 @@ export const PlayerCards: React.FC<{
             return (
               <div key={sl.key} style={{ minWidth: '100%', boxSizing: 'border-box', padding: '14px 16px 18px' }}>
                 {p ? (
-                  <div style={{ position: 'relative' }}>
-                    {/* パターン B：電車の裏に、背景として貧乏神の画像 */}
-                    {bombyImageStyle === 'train' && possessed && (
-                      <motion.img
-                        src={getBombyImageUrl(bombyType)}
-                        alt=""
-                        draggable={false}
-                        animate={{ y: [0, -6, 0], scale: [1, 1.04, 1] }}
-                        transition={{ repeat: Infinity, duration: 2.6, ease: 'easeInOut' }}
-                        // 電車と雲に顔が隠れないよう、左上にずらして大きめに
-                        style={{ position: 'absolute', left: '50%', top: -22, marginLeft: -150, width: 150, height: 150, objectFit: 'contain', opacity: 0.55, pointerEvents: 'none', zIndex: 0 }}
-                      />
-                    )}
-                    <div style={{ position: 'relative', zIndex: 1 }}>
-                      <TrainIllustration color={sl.color} accent={sl.accent} bombyType={possessed ? bombyType : null} />
-                    </div>
-                  </div>
+                  <TrainIllustration color={sl.color} accent={sl.accent} bombyType={possessed ? bombyType : null} />
                 ) : (
                   <div style={{ height: 150, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
                     <QRCodeSVG value={inviteUrl} size={110} />
@@ -265,88 +249,6 @@ export const PlayerCards: React.FC<{
 };
 
 // --- ③ マップ UI ---
-/**
- * 路線マップ。各駅のマスの色（青・赤・協力・アイテム）を表示し、
- * 次に止まる可能性がある駅（サイコロ 1 個なら 1〜6 マス先、後半に 2 個を選べば最大 12 マス先）を強調する
- */
-export const GameMapView: React.FC<{
-  currentStationName: string;
-  sharedPosition: number;
-  squares: SquareType[];
-  maxMove: number;
-}> = ({ currentStationName, sharedPosition, squares, maxMove }) => (
-  <motion.div initial={{ x: 20, opacity: 0 }} animate={{ x: 0, opacity: 1 }} exit={{ x: 20, opacity: 0 }} transition={{ duration: 0.2 }} style={{ padding: '20px', background: '#e1efc3', borderRadius: '16px', minHeight: '70vh', border: '4px solid #badc58', position: 'relative', overflow: 'hidden' }}>
-    <div style={{ textAlign: 'center', marginBottom: '16px', position: 'relative', zIndex: 10 }}>
-      <span style={{ background: '#fff', padding: '10px 20px', borderRadius: '25px', fontWeight: '800', color: '#27ae60', border: '3px solid #27ae60', fontSize: '1.2rem', boxShadow: '0 6px 0 rgba(39,174,96,0.3)' }}>
-        📍 現在地: {currentStationName}
-      </span>
-    </div>
-    {/* 凡例 */}
-    <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: '6px 12px', marginBottom: '8px', fontSize: '0.8rem', fontWeight: 800 }}>
-      {(Object.keys(SQUARE_STYLE) as SquareType[]).map((t) => (
-        <span key={t} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, color: '#2c3e50' }}>
-          <span style={{ width: 12, height: 12, borderRadius: '50%', background: SQUARE_STYLE[t].color, display: 'inline-block' }} />
-          {SQUARE_STYLE[t].label}
-        </span>
-      ))}
-    </div>
-    <p style={{ textAlign: 'center', margin: '0 0 8px 0', fontSize: '0.8rem', fontWeight: 800, color: '#e67e22' }}>
-      ✨ 光っている駅：次に止まる可能性がある駅（{maxMove}マス先まで）
-    </p>
-    <div style={{ position: 'relative', width: '100%', padding: '20px 0', marginTop: '10px' }}>
-      <div style={{ position: 'absolute', top: '0', bottom: '0', left: '50%', transform: 'translateX(-50%)', width: '16px', background: '#a4b0be', borderRadius: '8px', zIndex: 0, boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.2)' }}></div>
-      {STATIONS.map((station, index) => {
-        const isHere = index === sharedPosition;
-        const isPassed = index < sharedPosition;
-        const isStart = index === 0;
-        const isGoal = index === STATIONS.length - 1;
-        const isLeft = index % 2 === 0;
-        const isReachable = index > sharedPosition && index <= sharedPosition + maxMove;
-        const sq = squares[index];
-        const sqStyle = sq ? SQUARE_STYLE[sq] : null;
-        // スタート駅はミッションがないので色なし
-        const fill = isStart ? '#fff' : isPassed ? '#bdc3c7' : sqStyle?.color ?? '#fff';
-
-        return (
-          <div key={index} style={{ display: 'flex', justifyContent: 'center', position: 'relative', height: '110px', alignItems: 'center' }}>
-            <motion.div 
-              animate={{ scale: isHere ? [1, 1.2, 1] : 1 }} 
-              transition={{ repeat: isHere ? Infinity : 0, duration: 1.5 }} 
-              style={{ 
-                position: 'absolute', left: '50%', transform: 'translate(-50%, 0)', 
-                width: isHere || isGoal || isStart ? '52px' : '40px', 
-                height: isHere || isGoal || isStart ? '52px' : '40px', 
-                borderRadius: '50%', background: fill, 
-                border: isHere ? '6px solid #f39c12' : isReachable ? '5px solid #fff' : (isGoal ? '6px solid #e74c3c' : '5px solid #95a5a6'), 
-                zIndex: 2, display: 'flex', justifyContent: 'center', alignItems: 'center', 
-                boxShadow: isHere ? '0 0 20px rgba(241,196,15,0.8)' : isReachable ? '0 0 0 4px #f39c12, 0 0 16px rgba(243,156,18,0.9)' : '0 4px 0 rgba(0,0,0,0.1)' 
-              }}
-            >
-              {isHere && <span style={{ fontSize: '1.6rem', transform: 'translateY(-3px)' }}>👤</span>}
-              {(!isHere && isGoal) && <span style={{ fontSize: '1.4rem' }}>🏁</span>}
-              {(!isHere && isStart) && <span style={{ fontSize: '1.2rem' }}>🚩</span>}
-            </motion.div>
-            <div style={{ 
-              position: 'absolute', [isLeft ? 'right' : 'left']: 'calc(50% + 40px)', 
-              background: isHere ? '#fff9e6' : '#fff', border: isHere ? '3px solid #f39c12' : isReachable ? '3px solid #f39c12' : '3px solid #dcdde1', 
-              padding: '8px 14px', borderRadius: '16px', fontWeight: '800', fontSize: '1.05rem',
-              color: isPassed ? '#7f8c8d' : '#2c3e50', boxShadow: isHere ? '0 6px 0 rgba(243,156,18,0.3)' : '0 4px 0 rgba(0,0,0,0.05)',
-              whiteSpace: 'nowrap', zIndex: 1, textAlign: 'center'
-            }}>
-              {station}
-              {!isStart && !isPassed && sqStyle && (
-                <div style={{ fontSize: '0.7rem', color: sqStyle.color, marginTop: 2 }}>
-                  {sqStyle.label}{isReachable ? `・${index - sharedPosition}マス先` : ''}
-                </div>
-              )}
-            </div>
-          </div>
-        );
-      })}
-    </div>
-  </motion.div>
-);
-
 export const BottomNav: React.FC<{ activeTab: 'main' | 'map'; onChangeTab: (tab: 'main' | 'map') => void }> = ({ activeTab, onChangeTab }) => (
   <>
     {/* 🔑 最終手段：画面の一番下を強制的に白で塗りつぶす「土台」 */}
