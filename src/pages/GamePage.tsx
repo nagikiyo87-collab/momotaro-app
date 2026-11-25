@@ -1,9 +1,9 @@
 import React, { useState, useEffect, lazy, Suspense } from 'react';
 import { useGameSync } from '../hooks/useGameSync';
 import { useTurnActions } from '../hooks/useTurnActions';
-import { STATIONS, STATION_PROPERTIES, MISSIONS, ITEMS, PASSIVE_ITEMS } from '../data/gameData'; 
+import { STATIONS, STATION_PROPERTIES, MISSIONS, ITEMS, PASSIVE_ITEMS, getStationSquares } from '../data/gameData'; 
 import { RuleModal } from '../components/RuleModal';
-import { GameHeader, PlayerCards, GameMapView, BottomNav, AnimatedRoulette, SeasonalBackground, DestinationPhaseUI, MissionPhaseUI, SpendingPhaseUI, BiddingPhaseUI, ResultPhaseUI } from '../components/GameUI';
+import { GameHeader, PlayerCards, GameMapView, BottomNav, SeasonalBackground, StationShopList, DestinationPhaseUI, MissionPhaseUI, SpendingPhaseUI, BiddingPhaseUI, ResultPhaseUI } from '../components/GameUI';
 import { motion, AnimatePresence } from 'framer-motion';
 import { doc, updateDoc } from 'firebase/firestore';
 import { db } from '../firebase';
@@ -292,29 +292,11 @@ export const GamePage: React.FC<Props> = ({ roomId, userId }) => {
                     </>
                   )}
 
+                  {/* ルーレットは廃止（2026-11-25）。変更前に作った部屋でこの画面に止まっていたら先へ進める */}
                   {phase === 'roulette' && (
-                    <>
-                      <h3 style={{ margin: '0 0 15px 0', color: isMyTurn ? '#2ed573' : '#747d8c', fontWeight: '800', fontSize: '1.3rem' }}>
-                        {isMyTurn ? '⏱️ 滞在時間 ＆ マス決定！' : '⏳ 相手がルーレットを回しています...'}
-                      </h3>
-                      
-                      <div style={{ marginBottom: '20px' }}>
-                        <AnimatedRoulette 
-                          isSpinning={actions.isAnimatingRoulette} 
-                          result={actions.rouletteResult} 
-                        />
-                      </div>
-                      
-                      {actions.pendingRouletteData !== null ? (
-                        <button className="btn-pop" onClick={actions.handleConfirmRoulette} disabled={!isMyTurn}>
-                          🚀 目的地決定へ進む！
-                        </button>
-                      ) : (
-                        <button className="btn-pop btn-green" onClick={actions.handleSpinRoulette} disabled={!isMyTurn || actions.rouletteResult !== null || actions.isSpinningRoulette}>
-                          {actions.isSpinningRoulette ? '⏱️ ルーレット回転中...' : 'ルーレットを回す'}
-                        </button>
-                      )}
-                    </>
+                    <button className="btn-pop btn-green" onClick={actions.handleArrive} disabled={!isMyTurn}>
+                      {isMyTurn ? '🚀 この駅のミッションへ進む' : '⏳ 代表者を待っています...'}
+                    </button>
                   )}
 
                   {phase === 'destination' && (
@@ -326,6 +308,8 @@ export const GamePage: React.FC<Props> = ({ roomId, userId }) => {
                       savedDestinations={roomData?.destinations}
                       onSubmit={actions.handleSubmitDestination}
                       onStart={actions.handleConfirmDestinations}
+                      stationName={currentStationName}
+                      properties={currentProperties}
                     />
                   )}
 
@@ -358,8 +342,10 @@ export const GamePage: React.FC<Props> = ({ roomId, userId }) => {
                         opponentMission={opponentMission} 
                         opponentName={opponent?.name || '相手'} 
                         isMyTurn={isMyTurn} 
-                        onEndMission={(mySuccess, opSuccess, reachedFirst) => actions.handleEndMission(mySuccess, opSuccess, myMission, opponentMission, reachedFirst)} 
+                        onEndMission={(mySuccess, opSuccess) => actions.handleEndMission(mySuccess, opSuccess, myMission, opponentMission)} 
                       />
+                      {/* ミッション中も、この駅で買える物件を見られるように */}
+                      <StationShopList stationName={currentStationName} properties={currentProperties} />
                     </>
                   )}
 
@@ -397,7 +383,14 @@ export const GamePage: React.FC<Props> = ({ roomId, userId }) => {
               </motion.div>
             )}
 
-            {activeTab === 'map' && <GameMapView currentStationName={currentStationName} sharedPosition={sharedPosition} />}
+            {activeTab === 'map' && (
+              <GameMapView
+                currentStationName={currentStationName}
+                sharedPosition={sharedPosition}
+                squares={getStationSquares(roomId)}
+                maxMove={actions.canChooseDiceCount ? 12 : 6}
+              />
+            )}
           </AnimatePresence>
 
           <BottomNav activeTab={activeTab} onChangeTab={setActiveTab} />

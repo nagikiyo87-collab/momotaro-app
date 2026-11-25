@@ -1,12 +1,11 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { doc, updateDoc, deleteField } from 'firebase/firestore';
 import { db } from '../firebase';
-import { STATIONS, MISSIONS, ITEMS, SHIELD_ID, isAttackItem, pickItemIndexByRarity, SETTLEMENT_SEASONS, DEBT_INTEREST_RATE, DEBT_INTEREST_SEASON, BOMBY_REFORM, type Mission, type Property } from '../data/gameData';
+import { STAY_TIMES, getStationSquares, STATIONS, MISSIONS, ITEMS, SHIELD_ID, isAttackItem, pickItemIndexByRarity, SETTLEMENT_SEASONS, DEBT_INTEREST_RATE, DEBT_INTEREST_SEASON, BOMBY_REFORM, type Mission, type Property } from '../data/gameData';
 import { useModal } from '../contexts/ModalContext';
 import { ITEM_REGISTRY } from '../game/items/itemRegistry';
 import type { ItemContext } from '../game/items/types';
 
-const STAY_TIMES = [30, 45, 60];
 // ミッションの結果で効果が出て、使い切りになるカード
 const MISSION_EFFECTS = ['i_reward_double', 'i_mission_pass'];
 const SEASONS = ['spring', 'summer', 'autumn', 'winter'];
@@ -37,10 +36,7 @@ export const useTurnActions = (
   const pendingDiceBonus: number = roomData?.pendingDiceBonus ?? 0;
   const diceRollKey: number | null = roomData?.diceRollKey ?? null;
   const diceSeed: number | undefined = roomData?.diceSeed ?? undefined;
-  const isSpinningRoulette = roomData?.isSpinningRoulette || false;
-  const pendingRouletteData = roomData?.pendingRouletteData ?? null;
 
-  const [displayRoulette, setDisplayRoulette] = useState<number | null>(null);
 
   const sharedPosition = roomData?.sharedPosition || 0;
   // 後半（折り返し以降）は、サイコロを 1 個か 2 個か選べる（2026-11-25 ユーザー決定）
@@ -49,29 +45,7 @@ export const useTurnActions = (
   const currentSeason = roomData?.season || 'spring';
   const bombyPossessedId = roomData?.bombyPossessedId;
 
-  const [isAnimatingRoulette, setIsAnimatingRoulette] = useState(false);
 
-  useEffect(() => {
-    let interval: number;
-    if (isSpinningRoulette && pendingRouletteData !== null) {
-      setIsAnimatingRoulette(true);
-      let count = 0;
-      const maxCount = 20;
-      interval = window.setInterval(() => {
-        setDisplayRoulette(STAY_TIMES[Math.floor(Math.random() * STAY_TIMES.length)]);
-        count++;
-        if (count >= maxCount) {
-          window.clearInterval(interval);
-          setDisplayRoulette(pendingRouletteData.time); 
-          setIsAnimatingRoulette(false);
-        }
-      }, 50);
-    } else if (!isSpinningRoulette && pendingRouletteData === null) {
-      setDisplayRoulette(null);
-      setIsAnimatingRoulette(false);
-    }
-    return () => window.clearInterval(interval);
-  }, [isSpinningRoulette, pendingRouletteData]);
 
   const processDebtAndSales = (initialMoney: number, properties: Property[], moneyChange: number) => {
     let newMoney = initialMoney + moneyChange;
@@ -127,7 +101,9 @@ export const useTurnActions = (
     
     // 🔑 awaitを外して即時画面切り替え
     updateDoc(doc(db, 'rooms', roomId), { 
-      sharedPosition: nextPosition, lastDiceRoll: pendingDiceTotal, phase: 'roulette', isRollingDice: false, pendingDiceTotal: null,
+      sharedPosition: nextPosition, lastDiceRoll: pendingDiceTotal, isRollingDice: false, pendingDiceTotal: null,
+      // ルーレットはなし。着いたらすぐミッションと滞在時間が決まって目的地の入力へ
+      ...arrivalUpdates(nextPosition),
       pendingDiceValues: null, pendingDiceBonus: 0,
     }).catch(console.error);
   };
@@ -185,42 +161,42 @@ export const useTurnActions = (
     updateDoc(doc(db, 'rooms', roomId), { [`players.${userId}.items`]: newItems }).catch(console.error);
   };
 
-  const handleSpinRoulette = async () => {
-    if (!opponentId || isSpinningRoulette || pendingRouletteData !== null) return;
-    const timeResult = STAY_TIMES[Math.floor(Math.random() * STAY_TIMES.length)];
-    const squareTypes = ['blue', 'red', 'green', 'yellow'] as const;
-    let chosenType: typeof squareTypes[number] = squareTypes[Math.floor(Math.random() * squareTypes.length)];
-    let targetMissions = MISSIONS.filter(m => m.type === chosenType);
-    if (chosenType === 'yellow') targetMissions = MISSIONS; 
+  /**
+   * 駅に着いたときの準備（以前のルーレットの代わり。2026-11-25）
+   * - マスの色は駅ごとに決まっている（getStationSquares。マップで事前に見える）
+   * - 滞在時間は 30／45／60 分からランダム（出方は以前のルーレットと同じ）
+   * - その色のミッションを 2 人に配る（協力マスは同じミッション）
+   */
+  const arrivalUpdates = (position: number) => {
+    const squareType = getStationSquares(roomId)[position];
+    const stayTime = STAY_TIMES[Math.floor(Math.random() * STAY_TIMES.length)];
+    const targetMissions = squareType === 'yellow' ? MISSIONS : MISSIONS.filter(m => m.type === squareType);
 
     let myMissionObj: Mission; let opponentMissionObj: Mission;
     const randomMission = targetMissions[Math.floor(Math.random() * targetMissions.length)];
-
-    if (chosenType === 'green' || (chosenType === 'yellow' && randomMission.type === 'green')) {
+    if (squareType === 'green' || (squareType === 'yellow' && randomMission.type === 'green')) {
       myMissionObj = randomMission; opponentMissionObj = randomMission;
     } else {
       myMissionObj = randomMission;
       const otherMissions = targetMissions.filter(m => m.id !== myMissionObj.id);
       opponentMissionObj = otherMissions.length > 0 ? otherMissions[Math.floor(Math.random() * otherMissions.length)] : myMissionObj;
     }
-    
-    // 🔑 awaitを外す
-    updateDoc(doc(db, 'rooms', roomId), {
-      isSpinningRoulette: true, pendingRouletteData: { time: timeResult, squareType: chosenType, myMissionId: myMissionObj.id, opMissionId: opponentMissionObj.id }
-    }).catch(console.error);
+    return {
+      stayTime,
+      squareType,
+      currentMissions: { [userId]: myMissionObj.id, [opponentId!]: opponentMissionObj.id },
+      phase: 'destination',
+      destinations: {},
+    };
   };
 
-  const handleConfirmRoulette = async () => {
-    if (!pendingRouletteData || !opponentId) return;
-    // 🔑 awaitを外す
+  /** ルーレットの画面で止まっている古い部屋（この変更より前に作った部屋）を先へ進める */
+  const handleArrive = async () => {
+    if (!opponentId || !isMyTurn) return;
     updateDoc(doc(db, 'rooms', roomId), {
-      stayTime: pendingRouletteData.time, 
-      squareType: pendingRouletteData.squareType, 
-      currentMissions: { [userId]: pendingRouletteData.myMissionId, [opponentId]: pendingRouletteData.opMissionId }, 
-      phase: 'destination', 
-      destinations: {}, 
+      ...arrivalUpdates(sharedPosition),
       isSpinningRoulette: false,
-      pendingRouletteData: null
+      pendingRouletteData: null,
     }).catch(console.error);
   };
 
@@ -252,7 +228,7 @@ export const useTurnActions = (
   };
 
   const handleEndMission = async (
-    mySuccess: boolean, opponentSuccess: boolean, myMission?: Mission | null, opponentMission?: Mission | null, reachedFirstDest: boolean = true 
+    mySuccess: boolean, opponentSuccess: boolean, myMission?: Mission | null, opponentMission?: Mission | null
   ) => {
     if (!opponentId || !myMission || !opponentMission) return;
     let actualMySuccess = mySuccess;
@@ -323,19 +299,6 @@ export const useTurnActions = (
       }
     }
 
-    let destPenaltyMsg = '';
-    const currentTurn = roomData?.currentTurn;
-    if (!reachedFirstDest) {
-      const PENALTY_AMOUNT = 1000;
-      if (currentTurn === userId) {
-        myMoneyChange -= PENALTY_AMOUNT;
-        destPenaltyMsg = `\n⏰ 【到着失敗】代表者(あなた)にペナルティ -${PENALTY_AMOUNT}円！`;
-      } else if (currentTurn === opponentId) {
-        opponentMoneyChange -= PENALTY_AMOUNT;
-        destPenaltyMsg = `\n⏰ 【到着失敗】代表者(あいて)にペナルティ -${PENALTY_AMOUNT}円！`;
-      }
-    }
-
     const myResult = processDebtAndSales(me?.money || 0, me?.properties || [], myMoneyChange);
     const opResult = processDebtAndSales(opponent?.money || 0, opponent?.properties || [], opponentMoneyChange);
 
@@ -344,7 +307,6 @@ export const useTurnActions = (
     else if (!actualMySuccess && !actualOpSuccess) newBombyId = Math.random() < 0.5 ? userId : opponentId; 
 
     let alertMsg = `【ミッション結果】\nあなた: ${myMoneyChange >= 0 ? '+' : ''}${myMoneyChange}円${myItemMsg}\nあいて: ${opponentMoneyChange >= 0 ? '+' : ''}${opponentMoneyChange}円${opponentItemMsg}\n`;
-    alertMsg += destPenaltyMsg; 
     if (myResult.soldNames.length > 0) alertMsg += `\n⚠️ 借金返済のため、あなたの物件が売却されました: ${myResult.soldNames.join(', ')}`;
     if (opResult.soldNames.length > 0) alertMsg += `\n⚠️ 借金返済のため、あいての物件が売却されました: ${opResult.soldNames.join(', ')}`;
     
@@ -575,14 +537,13 @@ export const useTurnActions = (
   };
 
   return {
-    rouletteResult: displayRoulette,
     selectedPropertyId, setSelectedPropertyId, bidAmount, setBidAmount, activeItemEffect, canChooseDiceCount,
-    isRollingDice, isSpinningRoulette, isAnimatingRoulette,
-    pendingDiceTotal, pendingDiceValues, pendingDiceBonus, diceRollKey, diceSeed, pendingRouletteData,
+    isRollingDice,
+    pendingDiceTotal, pendingDiceValues, pendingDiceBonus, diceRollKey, diceSeed,
     spentInput, setSpentInput,
     dest1, setDest1, dest2, setDest2, dest3, setDest3, 
     handleRollDice, handleConfirmMove, handleUseItem, handleDiscardItem, 
-    handleSpinRoulette, handleConfirmRoulette, 
+    handleArrive, 
     handleSubmitDestination, handleConfirmDestinations, 
     handleEndMission, handleSubmitSpending, handleFinishSpending, 
     handleSubmitBid, handleRevealBids, handleBombyAction,

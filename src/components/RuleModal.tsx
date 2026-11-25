@@ -131,7 +131,7 @@ export const RuleModal: React.FC<Props> = ({ isOpen, onClose, onAdjustMoney }) =
                     ゴール（高尾山口駅）に到着した時点で、**「所持金 ＋ 物件の価値」** の総資産が多かった方の勝利です。<br/><br/>
                     **【ゲームの流れ】**<br/>
                     ① 代表者がサイコロを振って2人で進む。**後半（折り返しを過ぎたら）はサイコロを1個か2個か選べます。**<br/>
-                    ② ルーレットで「滞在時間」と「マスの種類」を決める。<br/>
+                    ② 着いた駅のマスの色でミッションが決まり、滞在時間（30・45・60分）もランダムで決まる。<br/>
                     ③ お互いの行きたい目的地を決め、確定したら出発。<br/>
                     ④ 制限時間内にミッションを実行する。<br/>
                     ⑤ 滞在中、現実で使ったお金を入力して所持金から引く。<br/>
@@ -186,12 +186,9 @@ export const RuleModal: React.FC<Props> = ({ isOpen, onClose, onAdjustMoney }) =
                     <li><b style={{ color: '#2ecc71' }}>🟢 協力マス</b>：2人で成功すればボーナス！</li>
                     <li><b style={{ color: '#f1c40f' }}>🟡 アイテムマス</b>：成功するとアイテムGET！</li>
                   </ul>
-                  <div style={{ background: '#ffefeb', padding: '10px', borderRadius: '8px', border: '2px solid #ff7675' }}>
-                    <h4 style={{ color: '#c0392b', margin: '0 0 5px 0', fontSize: '0.95rem' }}>⏰ 到達ペナルティ</h4>
-                    <p style={{ fontSize: '0.85rem', margin: 0, color: '#d63031', lineHeight: '1.5' }}>
-                      タイマー内に「1番目の目的地」に到着できなかった場合、**目的地を決めた代表者のみ -1,000円** のペナルティを受けます。
-                    </p>
-                  </div>
+                  <p style={{ fontSize: '0.85rem', color: '#57606f', lineHeight: '1.5' }}>
+                    マスの色は駅ごとに決まっていて、マップで先の駅の色が見られます。到着すると、滞在時間（30・45・60分のどれか）とミッションがすぐに決まります。
+                  </p>
                 </div>
               )}
 

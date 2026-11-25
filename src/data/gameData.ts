@@ -338,3 +338,38 @@ export const DEBT_INTEREST_SEASON = 'winter';
  * 貧乏神の番に prob の確率で「改心」して、悪さをする代わりに gift 円をくれる
  */
 export const BOMBY_REFORM = { gap: 3000, prob: 0.25, gift: 3000 };
+
+// ==========================================
+// 🟦 駅ごとのマスの色（2026-11-25 ルーレット廃止に合わせて追加）
+// ==========================================
+export type SquareType = 'blue' | 'red' | 'green' | 'yellow';
+export const SQUARE_TYPES: SquareType[] = ['blue', 'red', 'green', 'yellow'];
+
+/**
+ * 部屋ごとに、各駅のマスの色を決める（4 色が同じ確率）。
+ * 部屋番号から計算するので、2 台とも同じ結果になり、部屋のデータに保存する必要がない。
+ * 部屋が変われば色の並びも変わる
+ */
+export const getStationSquares = (roomId: string): SquareType[] => {
+  let h = 2166136261;
+  for (let i = 0; i < roomId.length; i++) h = Math.imul(h ^ roomId.charCodeAt(i), 16777619);
+  let s = h >>> 0;
+  const rand = () => {
+    s = (s + 0x6d2b79f5) | 0;
+    let t = Math.imul(s ^ (s >>> 15), 1 | s);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+  return STATIONS.map(() => SQUARE_TYPES[Math.floor(rand() * SQUARE_TYPES.length)]);
+};
+
+/** マスの色の表示用 */
+export const SQUARE_STYLE: Record<SquareType, { label: string; color: string; bg: string }> = {
+  blue: { label: '青マス', color: '#1e88e5', bg: '#e3f2fd' },
+  red: { label: '赤マス', color: '#e53935', bg: '#ffebee' },
+  green: { label: '協力マス', color: '#43a047', bg: '#e8f5e9' },
+  yellow: { label: 'アイテムマス', color: '#f9a825', bg: '#fffde7' },
+};
+
+/** 滞在時間の候補（ランダムで 1 つ。出方は以前のルーレットと同じ） */
+export const STAY_TIMES = [30, 45, 60];

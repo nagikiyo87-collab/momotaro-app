@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { QRCodeSVG } from 'qrcode.react';
-import { STATIONS, ITEMS, START_MONEY, type Mission, type Property } from '../data/gameData';
+import { STATIONS, ITEMS, START_MONEY, SQUARE_STYLE, type SquareType, type Mission, type Property } from '../data/gameData';
 import { useModal } from '../contexts/ModalContext';
 import { doc, updateDoc } from 'firebase/firestore';
 import { db } from '../firebase';
@@ -169,14 +169,35 @@ export const PlayerCards: React.FC<{
 };
 
 // --- ③ マップ UI ---
-export const GameMapView: React.FC<{ currentStationName: string; sharedPosition: number }> = ({ currentStationName, sharedPosition }) => (
+/**
+ * 路線マップ。各駅のマスの色（青・赤・協力・アイテム）を表示し、
+ * 次に止まる可能性がある駅（サイコロ 1 個なら 1〜6 マス先、後半に 2 個を選べば最大 12 マス先）を強調する
+ */
+export const GameMapView: React.FC<{
+  currentStationName: string;
+  sharedPosition: number;
+  squares: SquareType[];
+  maxMove: number;
+}> = ({ currentStationName, sharedPosition, squares, maxMove }) => (
   <motion.div initial={{ x: 20, opacity: 0 }} animate={{ x: 0, opacity: 1 }} exit={{ x: 20, opacity: 0 }} transition={{ duration: 0.2 }} style={{ padding: '20px', background: '#e1efc3', borderRadius: '16px', minHeight: '70vh', border: '4px solid #badc58', position: 'relative', overflow: 'hidden' }}>
-    <div style={{ textAlign: 'center', marginBottom: '40px', position: 'relative', zIndex: 10 }}>
+    <div style={{ textAlign: 'center', marginBottom: '16px', position: 'relative', zIndex: 10 }}>
       <span style={{ background: '#fff', padding: '10px 20px', borderRadius: '25px', fontWeight: '800', color: '#27ae60', border: '3px solid #27ae60', fontSize: '1.2rem', boxShadow: '0 6px 0 rgba(39,174,96,0.3)' }}>
         📍 現在地: {currentStationName}
       </span>
     </div>
-    <div style={{ position: 'relative', width: '100%', padding: '20px 0', marginTop: '20px' }}>
+    {/* 凡例 */}
+    <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: '6px 12px', marginBottom: '8px', fontSize: '0.8rem', fontWeight: 800 }}>
+      {(Object.keys(SQUARE_STYLE) as SquareType[]).map((t) => (
+        <span key={t} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, color: '#2c3e50' }}>
+          <span style={{ width: 12, height: 12, borderRadius: '50%', background: SQUARE_STYLE[t].color, display: 'inline-block' }} />
+          {SQUARE_STYLE[t].label}
+        </span>
+      ))}
+    </div>
+    <p style={{ textAlign: 'center', margin: '0 0 8px 0', fontSize: '0.8rem', fontWeight: 800, color: '#e67e22' }}>
+      ✨ 光っている駅：次に止まる可能性がある駅（{maxMove}マス先まで）
+    </p>
+    <div style={{ position: 'relative', width: '100%', padding: '20px 0', marginTop: '10px' }}>
       <div style={{ position: 'absolute', top: '0', bottom: '0', left: '50%', transform: 'translateX(-50%)', width: '16px', background: '#a4b0be', borderRadius: '8px', zIndex: 0, boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.2)' }}></div>
       {STATIONS.map((station, index) => {
         const isHere = index === sharedPosition;
@@ -184,6 +205,11 @@ export const GameMapView: React.FC<{ currentStationName: string; sharedPosition:
         const isStart = index === 0;
         const isGoal = index === STATIONS.length - 1;
         const isLeft = index % 2 === 0;
+        const isReachable = index > sharedPosition && index <= sharedPosition + maxMove;
+        const sq = squares[index];
+        const sqStyle = sq ? SQUARE_STYLE[sq] : null;
+        // スタート駅はミッションがないので色なし
+        const fill = isStart ? '#fff' : isPassed ? '#bdc3c7' : sqStyle?.color ?? '#fff';
 
         return (
           <div key={index} style={{ display: 'flex', justifyContent: 'center', position: 'relative', height: '110px', alignItems: 'center' }}>
@@ -194,10 +220,10 @@ export const GameMapView: React.FC<{ currentStationName: string; sharedPosition:
                 position: 'absolute', left: '50%', transform: 'translate(-50%, 0)', 
                 width: isHere || isGoal || isStart ? '52px' : '40px', 
                 height: isHere || isGoal || isStart ? '52px' : '40px', 
-                borderRadius: '50%', background: isHere ? '#f1c40f' : (isPassed ? '#bdc3c7' : '#fff'), 
-                border: isHere ? '6px solid #f39c12' : (isGoal ? '6px solid #e74c3c' : '5px solid #95a5a6'), 
+                borderRadius: '50%', background: fill, 
+                border: isHere ? '6px solid #f39c12' : isReachable ? '5px solid #fff' : (isGoal ? '6px solid #e74c3c' : '5px solid #95a5a6'), 
                 zIndex: 2, display: 'flex', justifyContent: 'center', alignItems: 'center', 
-                boxShadow: isHere ? '0 0 20px rgba(241,196,15,0.8)' : '0 4px 0 rgba(0,0,0,0.1)' 
+                boxShadow: isHere ? '0 0 20px rgba(241,196,15,0.8)' : isReachable ? '0 0 0 4px #f39c12, 0 0 16px rgba(243,156,18,0.9)' : '0 4px 0 rgba(0,0,0,0.1)' 
               }}
             >
               {isHere && <span style={{ fontSize: '1.6rem', transform: 'translateY(-3px)' }}>👤</span>}
@@ -206,12 +232,17 @@ export const GameMapView: React.FC<{ currentStationName: string; sharedPosition:
             </motion.div>
             <div style={{ 
               position: 'absolute', [isLeft ? 'right' : 'left']: 'calc(50% + 40px)', 
-              background: isHere ? '#fff9e6' : '#fff', border: isHere ? '3px solid #f39c12' : '3px solid #dcdde1', 
-              padding: '10px 16px', borderRadius: '16px', fontWeight: '800', fontSize: '1.1rem',
+              background: isHere ? '#fff9e6' : '#fff', border: isHere ? '3px solid #f39c12' : isReachable ? '3px solid #f39c12' : '3px solid #dcdde1', 
+              padding: '8px 14px', borderRadius: '16px', fontWeight: '800', fontSize: '1.05rem',
               color: isPassed ? '#7f8c8d' : '#2c3e50', boxShadow: isHere ? '0 6px 0 rgba(243,156,18,0.3)' : '0 4px 0 rgba(0,0,0,0.05)',
-              whiteSpace: 'nowrap', zIndex: 1
+              whiteSpace: 'nowrap', zIndex: 1, textAlign: 'center'
             }}>
               {station}
+              {!isStart && !isPassed && sqStyle && (
+                <div style={{ fontSize: '0.7rem', color: sqStyle.color, marginTop: 2 }}>
+                  {sqStyle.label}{isReachable ? `・${index - sharedPosition}マス先` : ''}
+                </div>
+              )}
             </div>
           </div>
         );
@@ -322,7 +353,18 @@ export const DestinationPhaseUI: React.FC<{
   savedDestinations: any; // 🔑 追加
   onSubmit: () => void;   // 🔑 追加
   onStart: () => void;    // 🔑 追加
-}> = ({ isMyTurn, dest1, setDest1, dest2, setDest2, dest3, setDest3, savedDestinations, onSubmit, onStart }) => {
+  stationName: string;
+  properties: Property[];
+}> = ({ isMyTurn, dest1, setDest1, dest2, setDest2, dest3, setDest3, savedDestinations, onSubmit, onStart, stationName, properties }) => {
+  // 物件をタップしたら、空いている目的地の欄に入れる（代表者は 1 番目→3 番目、相手は 2 番目）
+  const pickDestination = (name: string) => {
+    if (isMyTurn) {
+      if (!dest1) setDest1(name);
+      else setDest3(name);
+    } else {
+      setDest2(name);
+    }
+  };
   
   // DBのデータを見て、自分と相手が送信済みか判定する
   const mySubmitted = isMyTurn ? !!savedDestinations?.dest1 : !!savedDestinations?.dest2;
@@ -379,6 +421,9 @@ export const DestinationPhaseUI: React.FC<{
             <button className="btn-pop" onClick={onStart}>確定して出発！(タイマースタート)</button>
           </div>
         )}
+        {/* 目的地の候補として、この駅で買える物件を表示 */}
+        {!mySubmitted && <StationShopList stationName={stationName} properties={properties} onPick={pickDestination} />}
+
         {bothSubmitted && !isMyTurn && (
           <div style={{ marginTop: '25px', borderTop: '3px dashed #d2b4de', paddingTop: '20px', textAlign: 'center' }}>
             <p style={{ fontWeight: '800', color: '#3498db', fontSize: '1.1rem', marginBottom: '10px' }}>2人の目的地が揃いました！</p>
@@ -397,7 +442,7 @@ export const MissionPhaseUI: React.FC<{
   currentStationName: string; stayTime: number; squareType: string;
   destinations: { dest1: string; dest2: string; dest3: string } | null;
   myMission: Mission | undefined; opponentMission: Mission | undefined; opponentName: string;
-  isMyTurn: boolean; onEndMission: (mySuccess: boolean, opSuccess: boolean, reachedFirstDest: boolean) => void;
+  isMyTurn: boolean; onEndMission: (mySuccess: boolean, opSuccess: boolean) => void;
 }> = ({ roomId, timerData, currentStationName, stayTime, squareType, destinations, myMission, opponentMission, opponentName, isMyTurn, onEndMission }) => {
   const getMissionColor = (type?: string) => {
     if (type === 'blue') return { bg: '#e3f2fd', border: '#64b5f6', text: '#1976d2', label: '🔵 青マス' };
@@ -406,7 +451,6 @@ export const MissionPhaseUI: React.FC<{
     return { bg: '#e8f5e9', border: '#81c784', text: '#388e3c', label: '🟢 協力マス' }; 
   };
   const currentSquare = getMissionColor(squareType);
-  const [reachedFirstDest, setReachedFirstDest] = useState(true);
 
   // 🔑 追加：報酬とペナルティをわかりやすくバッジで表示する関数
   const renderRewardBadge = (mission: Mission, sqType: string) => {
@@ -486,23 +530,16 @@ export const MissionPhaseUI: React.FC<{
           <div style={{ background: '#fff', padding: '20px', borderRadius: '16px', border: '3px solid #ccc', boxShadow: '0 6px 0 rgba(0,0,0,0.1)', textAlign: 'left' }}>
             <p style={{ margin: '0 0 15px 0', fontWeight: '800', fontSize: '1.1rem', color: '#2c3e50', textAlign: 'center' }}>📝 ミッション結果を入力</p>
             
-            <div style={{ background: '#ffefeb', padding: '10px', borderRadius: '8px', border: '2px solid #ff7675', marginBottom: '20px' }}>
-              <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}>
-                <input type="checkbox" checked={reachedFirstDest} onChange={(e) => setReachedFirstDest(e.target.checked)} style={{ transform: 'scale(1.5)', marginRight: '15px', accentColor: '#e74c3c' }} />
-                <span style={{ fontWeight: 'bold', color: '#d63031', fontSize: '0.95rem' }}>1番目の目的地に間に合った<br/><span style={{ fontSize: '0.8rem', fontWeight: 'normal' }}>※外すと代表者に-1,000円のペナルティ</span></span>
-              </label>
-            </div>
-
             <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
-              <button className="btn-pop btn-green" onClick={() => onEndMission(true, true, reachedFirstDest)}>🎉 2人とも成功！</button>
+              <button className="btn-pop btn-green" onClick={() => onEndMission(true, true)}>🎉 2人とも成功！</button>
               {/* 協力ミッション（黄マスで出た場合も）は 2 人で 1 つの結果なので「どちらかだけ」は選べない */}
               {squareType !== 'green' && myMission?.type !== 'green' && (
                 <div style={{ display: 'flex', gap: '15px' }}>
-                  <button className="btn-pop btn-blue" onClick={() => onEndMission(true, false, reachedFirstDest)}>👍 あなたのみ</button>
-                  <button className="btn-pop btn-yellow" onClick={() => onEndMission(false, true, reachedFirstDest)}>👎 相手のみ</button>
+                  <button className="btn-pop btn-blue" onClick={() => onEndMission(true, false)}>👍 あなたのみ</button>
+                  <button className="btn-pop btn-yellow" onClick={() => onEndMission(false, true)}>👎 相手のみ</button>
                 </div>
               )}
-              <button className="btn-pop btn-gray" onClick={() => onEndMission(false, false, reachedFirstDest)}>😭 2人とも失敗...</button>
+              <button className="btn-pop btn-gray" onClick={() => onEndMission(false, false)}>😭 2人とも失敗...</button>
             </div>
           </div>
         ) : (
@@ -762,28 +799,43 @@ export const SeasonalBackground: React.FC<{ season: string }> = ({ season }) => 
   );
 };
 
-export const AnimatedRoulette: React.FC<{ isSpinning: boolean; result: number | null }> = ({ isSpinning, result }) => {
+/**
+ * その駅で買える物件の一覧。目的地を決めるときとミッション中に表示する。
+ * onPick を渡すと「目的地に入れる」ボタンが付く（目的地の入力の手間を減らす）
+ */
+export const StationShopList: React.FC<{
+  stationName: string;
+  properties: Property[];
+  onPick?: (name: string) => void;
+}> = ({ stationName, properties, onPick }) => {
+  if (properties.length === 0) return null;
   return (
-    <div style={{ height: '100px', overflow: 'hidden', display: 'flex', justifyContent: 'center', alignItems: 'center', background: '#f8f9fa', borderRadius: '16px', border: '4px solid #ecf0f1', position: 'relative' }}>
-      {isSpinning ? (
-        <motion.div
-          animate={{ y: [0, -100, 0] }}
-          transition={{ duration: 0.2, repeat: Infinity, ease: 'linear' }}
-          style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '20px' }}
-        >
-          <span style={{ fontSize: '3.5rem', fontWeight: '900', color: '#bdc3c7', filter: 'blur(2px)' }}>30</span>
-          <span style={{ fontSize: '3.5rem', fontWeight: '900', color: '#95a5a6', filter: 'blur(2px)' }}>45</span>
-          <span style={{ fontSize: '3.5rem', fontWeight: '900', color: '#7f8c8d', filter: 'blur(2px)' }}>60</span>
-        </motion.div>
-      ) : (
-        <motion.div initial={{ scale: 0, y: 50 }} animate={{ scale: 1, y: 0 }} transition={{ type: 'spring', bounce: 0.6 }}>
-          {result !== null ? (
-            <span style={{ fontSize: '3.5rem', fontWeight: '900', color: '#2ed573' }}>{result}分</span>
-          ) : (
-            <span style={{ color: '#aaa', fontWeight: 'bold' }}>最長滞在時間を決めます</span>
-          )}
-        </motion.div>
-      )}
+    <div style={{ background: '#fff', padding: '14px', borderRadius: '16px', border: '3px solid #ffeaa7', marginTop: '15px', textAlign: 'left' }}>
+      <p style={{ margin: '0 0 10px 0', fontWeight: 900, color: '#e17055', fontSize: '1rem' }}>🏠 {stationName}で買える物件</p>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+        {properties.map((p) => {
+          const income = Math.floor(p.price * (p.rate / 100));
+          return (
+            <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: '10px', background: '#fffbf0', borderRadius: '10px', padding: '8px 10px' }}>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontWeight: 800, color: '#2d3436', fontSize: '0.95rem' }}>{p.name}</div>
+                <div style={{ fontSize: '0.78rem', color: '#636e72', fontWeight: 700 }}>
+                  {p.type === 'fixed' ? `固定 ${p.price.toLocaleString()}円（行けば購入できる）` : `上限 ${p.price.toLocaleString()}円まで`}
+                  ・収益率 {p.rate}%（決算で +{income.toLocaleString()}円）
+                </div>
+              </div>
+              {onPick && (
+                <button
+                  onClick={() => onPick(p.name)}
+                  style={{ border: 'none', borderRadius: '999px', padding: '6px 10px', background: '#a29bfe', color: '#fff', fontWeight: 800, fontSize: '0.75rem', whiteSpace: 'nowrap', cursor: 'pointer' }}
+                >
+                  目的地に入れる
+                </button>
+              )}
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 };
