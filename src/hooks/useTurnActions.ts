@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { doc, updateDoc, deleteField, arrayUnion, arrayRemove } from 'firebase/firestore';
 import { db } from '../firebase';
-import { STAY_TIMES, getStationSquares, STATIONS, MISSIONS, ITEMS, SHIELD_ID, isAttackItem, pickItemIndexByRarity, SETTLEMENT_SEASONS, DEBT_INTEREST_RATE, DEBT_INTEREST_SEASON, BOMBY_REFORM, BOMBY_TRANSFORM_MS, type Mission, type Property } from '../data/gameData';
+import { STAY_TIMES, getStationSquares, STATIONS, MISSIONS, ITEMS, SHIELD_ID, isAttackItem, pickItemIndexByRarity, SETTLEMENT_SEASONS, DEBT_INTEREST_RATE, DEBT_INTEREST_SEASON, BOMBY_REFORM, type Mission, type Property } from '../data/gameData';
 import { useModal } from '../contexts/ModalContext';
 import { ITEM_REGISTRY } from '../game/items/itemRegistry';
 import type { ItemContext } from '../game/items/types';
@@ -505,13 +505,13 @@ export const useTurnActions = (
     const currentType = roomData?.bombyType || 'normal';
 
     if (newType !== currentType) {
-      // 変身の演出：部屋のデータに書くと、2 台とも BombyTransformOverlay で以前の画像を使った変身を再生する。
-      // 演出が終わるまで待ってから、悪行を表示する
-      updateDoc(doc(db, 'rooms', roomId), {
-        bombyType: newType,
-        bombyTransform: { from: currentType, to: newType, key: Date.now() },
-      }).catch(console.error);
-      await new Promise((resolve) => window.setTimeout(resolve, BOMBY_TRANSFORM_MS));
+      if (newType === 'king') {
+        await showAlert("⚡️⚡️⚡️⚡️⚡️⚡️⚡️\n\n「グエッヘッヘ！\nオレ様はキングボンビーだ！\nこれからお前に地獄を見せてやるのねん！」\n\n⚡️⚡️⚡️⚡️⚡️⚡️⚡️");
+      } else if (newType === 'petit') {
+        await showAlert("✨✨✨✨✨✨✨\n\n「ボク、プチボンビーなのねん！\nよろしくなのねん！」\n\n✨✨✨✨✨✨✨");
+      } else if (newType === 'normal') {
+        await showAlert("💨💨💨\n\n「普通の貧乏神に戻ったのねん…」\n\n💨💨💨");
+      }
     }
 
     let moneyChange = 0; let message = ''; let remainingProps = [...(me?.properties || [])];

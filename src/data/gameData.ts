@@ -379,6 +379,3 @@ export const STAY_TIMES = [30, 45, 60];
  * 新しいルールのシミュレーションで S 約 5%・A 約 20%・B 約 40%・C 約 35% になる
  */
 export const RANK_THRESHOLDS = { S: 15000, A: 7000, B: 2500 };
-
-/** 貧乏神の変身の演出の長さ（ミリ秒）。この間は悪行の表示を待つ */
-export const BOMBY_TRANSFORM_MS = 4200;

@@ -64,6 +64,10 @@ export const PlayerCards: React.FC<{
   me: any; opponent: any; isMyTurn: boolean; userId: string; opponentId: string | undefined;
   bombyPossessedId: string | null; bombyType: string; inviteUrl: string;
 }> = ({ me, opponent, isMyTurn, userId, opponentId, bombyPossessedId, bombyType, inviteUrl }) => {
+  // 以前使っていた貧乏神の画像
+  const getBombyImageUrl = (type: string) => (type === 'king' ? '/bomby-king.webp' : type === 'petit' ? '/bomby-petit.webp' : '/bomby-normal.webp');
+  // 見比べ用：画像を「名前タブの背景」に置くか「電車の裏」に置くか（URL に ?bombyStyle=tab で名前タブ。既定は電車の裏）
+  const bombyImageStyle: 'tab' | 'train' = new URLSearchParams(window.location.search).get('bombyStyle') === 'tab' ? 'tab' : 'train';
   const getBombyIcon = (type: string) => type === 'king' ? '👑' : type === 'petit' ? '👼' : '😈';
 
   const [detailPlayer, setDetailPlayer] = useState<'me' | 'opponent' | null>(null);
@@ -144,6 +148,16 @@ export const PlayerCards: React.FC<{
               style={{
                 flex: 1, border: 'none', borderRadius: 999, padding: '8px 4px', fontWeight: 900, fontSize: '0.85rem', cursor: 'pointer',
                 background: slide === i ? sl.color : 'rgba(255,255,255,0.8)', color: slide === i ? '#fff' : sl.dark,
+                // パターン A：貧乏神が憑いている人の名前タブの背景に、貧乏神の画像
+                ...(bombyImageStyle === 'tab' && sl.player && bombyPossessedId === sl.uid
+                  ? {
+                      // 左側は文字が読めるようにタブの色、右側は画像がはっきり見えるように透明
+                      backgroundImage: `linear-gradient(90deg, ${slide === i ? sl.color : '#ffffff'} 45%, ${slide === i ? sl.color + '00' : 'rgba(255,255,255,0)'} 80%), url(${getBombyImageUrl(bombyType)})`,
+                      backgroundSize: 'auto, auto 175%',
+                      backgroundPosition: 'center, right -4px center',
+                      backgroundRepeat: 'no-repeat',
+                    }
+                  : {}),
                 boxShadow: slide === i ? `0 3px 0 ${sl.dark}` : '0 1px 0 rgba(0,0,0,0.08)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
               }}
             >
@@ -188,7 +202,23 @@ export const PlayerCards: React.FC<{
             return (
               <div key={sl.key} style={{ minWidth: '100%', boxSizing: 'border-box', padding: '14px 16px 18px' }}>
                 {p ? (
-                  <TrainIllustration color={sl.color} accent={sl.accent} bombyType={possessed ? bombyType : null} />
+                  <div style={{ position: 'relative' }}>
+                    {/* パターン B：電車の裏に、背景として貧乏神の画像 */}
+                    {bombyImageStyle === 'train' && possessed && (
+                      <motion.img
+                        src={getBombyImageUrl(bombyType)}
+                        alt=""
+                        draggable={false}
+                        animate={{ y: [0, -6, 0], scale: [1, 1.04, 1] }}
+                        transition={{ repeat: Infinity, duration: 2.6, ease: 'easeInOut' }}
+                        // 電車と雲に顔が隠れないよう、左上にずらして大きめに
+                        style={{ position: 'absolute', left: '50%', top: -22, marginLeft: -150, width: 150, height: 150, objectFit: 'contain', opacity: 0.55, pointerEvents: 'none', zIndex: 0 }}
+                      />
+                    )}
+                    <div style={{ position: 'relative', zIndex: 1 }}>
+                      <TrainIllustration color={sl.color} accent={sl.accent} bombyType={possessed ? bombyType : null} />
+                    </div>
+                  </div>
                 ) : (
                   <div style={{ height: 150, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
                     <QRCodeSVG value={inviteUrl} size={110} />

@@ -8,7 +8,6 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { doc, updateDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { QRCodeSVG } from 'qrcode.react'; 
-import { BombyTransformOverlay } from '../components/bomby/BombyTransformOverlay';
 import '../styles/index.css'; 
 
 // 3D サイコロ（three.js を含むので、ゲーム画面に入ってから別に読み込む。タイトル画面は軽いまま）
@@ -404,8 +403,6 @@ export const GamePage: React.FC<Props> = ({ roomId, userId }) => {
       )}
 
       <RuleModal isOpen={isRuleOpen} onClose={() => setIsRuleOpen(false)} onAdjustMoney={handleAdjustMoney} />
-      {/* 貧乏神の変身の演出（ターンの終わり。2 台とも再生） */}
-      <BombyTransformOverlay transform={roomData?.bombyTransform} />
       <Suspense fallback={null}>
         <DiceRollOverlay
           rollKey={actions.diceRollKey}
