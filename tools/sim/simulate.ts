@@ -11,7 +11,7 @@
  * 現実の行動は計算できないので、下の SCENARIOS の数字で仮定する（2026-11-24 ユーザー了承）
  */
 import { writeFileSync, mkdirSync } from 'node:fs';
-import { STATIONS, STATION_PROPERTIES, MISSIONS, ITEMS, type Property, type Mission } from '../../src/data/gameData.ts';
+import { STATIONS, STATION_PROPERTIES, MISSIONS, ITEMS, SHIELD_ID, pickItemIndexByRarity, type Property, type Mission } from '../../src/data/gameData.ts';
 
 // ---------------------------------------------------------------- 仮定
 type Scenario = {
@@ -30,6 +30,10 @@ type Scenario = {
   interestRate?: number;
   interestOnlyWinter?: boolean; // 利息を冬の決算時だけにする
   settleSeasons?: number[]; // 決算する季節（0 春 1 夏 2 秋 3 冬）
+  twoDiceFromHalf?: boolean; // 折り返し（全体の半分）を過ぎたらサイコロ 2 個
+  // 貧乏神の逆転要素：憑かれている人が総資産で gap 円以上負けているとき、prob の確率で
+  // jump＝相手に乗り移る（悪行なし）／ gift＝改心してお金をくれる（悪行の代わりに +gift 円）
+  bombyComeback?: { gap: number; prob: number; kind: 'jump' | 'gift'; gift?: number };
 };
 
 const BASE: Scenario = {
@@ -60,6 +64,12 @@ const SCENARIOS: Scenario[] = [
     bannedItems: ['i_lottery', 'i_money_swap', 'i_money_reset'],
   },
   // ---- 改善案（アプリの現状とは違うルール）
+  { ...BASE, id: 'p_half_two_dice', label: '【案】折り返しを過ぎたらサイコロ 2 個', twoDiceFromHalf: true },
+  { ...BASE, id: 'p_bomby_jump', label: '【案】貧乏神：5,000 円以上負けていたら 10% で相手に乗り移る', bombyComeback: { gap: 5000, prob: 0.1, kind: 'jump' } },
+  { ...BASE, id: 'p_bomby_gift', label: '【案】貧乏神：5,000 円以上負けていたら 10% で改心して +3,000 円', bombyComeback: { gap: 5000, prob: 0.1, kind: 'gift', gift: 3000 } },
+  { ...BASE, id: 'p_bomby_jump20', label: '【案】貧乏神：5,000 円以上負けていたら 20% で相手に乗り移る', bombyComeback: { gap: 5000, prob: 0.2, kind: 'jump' } },
+  { ...BASE, id: 'p_bomby_jump_3k25', label: '【案】貧乏神：3,000 円以上負けていたら 25% で相手に乗り移る', bombyComeback: { gap: 3000, prob: 0.25, kind: 'jump' } },
+  { ...BASE, id: 'p_bomby_gift_3k25', label: '【案】貧乏神：3,000 円以上負けていたら 25% で改心して +3,000 円', bombyComeback: { gap: 3000, prob: 0.25, kind: 'gift', gift: 3000 } },
   { ...BASE, id: 'p_two_dice', label: '【案】移動のサイコロを最初から 2 個', diceCount: 2 },
   { ...BASE, id: 'p_start_10000', label: '【案】最初の所持金 10,000 円', startMoney: 10000 },
   { ...BASE, id: 'p_interest_winter', label: '【案】利息は冬の決算時だけ 10%', interestRate: 0.1, interestOnlyWinter: true },
@@ -72,6 +82,27 @@ const SCENARIOS: Scenario[] = [
     interestRate: 0.1,
     interestOnlyWinter: true,
     settleSeasons: [1, 3],
+  },
+  {
+    ...BASE,
+    id: 'p_combo_bomby',
+    label: '【案】お金の改善 3 点＋貧乏神 3,000 円以上負けで 25% 乗り移り',
+    startMoney: 10000,
+    interestRate: 0.1,
+    interestOnlyWinter: true,
+    settleSeasons: [1, 3],
+    bombyComeback: { gap: 3000, prob: 0.25, kind: 'jump' },
+  },
+  {
+    ...BASE,
+    id: 'p_combo_half_bomby',
+    label: '【案】お金の改善 3 点＋折り返しから 2 個＋貧乏神 25% 乗り移り',
+    startMoney: 10000,
+    interestRate: 0.1,
+    interestOnlyWinter: true,
+    settleSeasons: [1, 3],
+    twoDiceFromHalf: true,
+    bombyComeback: { gap: 3000, prob: 0.25, kind: 'jump' },
   },
 ];
 
@@ -185,6 +216,8 @@ type GameResult = {
   leadChanges: number;
   players: Player[];
   kingEvents: number;
+  comebackEvents: number;
+  holderLog: number[];
   bombyTurnsTotal: number;
   propertyBuys: { id: string; paid: number }[];
   itemWins: { item: string; won: boolean }[];
@@ -202,6 +235,8 @@ const playGame = (sc: Scenario): GameResult => {
   const cashByTurn: number[][] = [];
   let settlements = 0;
   let kingEvents = 0;
+  let comebackEvents = 0;
+  const holderLog: number[] = []; // ターンごとに憑かれていた人
   let bombyTurnsTotal = 0;
   let leadChanges = 0;
   let lastLeader: 0 | 1 | -1 = -1;
@@ -211,11 +246,19 @@ const playGame = (sc: Scenario): GameResult => {
   const canUse = (id: string) => sc.useItems && !sc.bannedItems.includes(id);
   const other = (i: 0 | 1) => (1 - i) as 0 | 1;
 
-  // アイテムを手に入れる（アプリと同じく 20 種から同じ確率。3 枠を超えたら一番古いものを捨てる）
+  // アイテムを手に入れる（3 枠を超えたら一番古いものを捨てる）
   const gain = (p: Player) => {
     const pool = ITEMS.filter((it) => !sc.bannedItems.includes(it.id));
-    p.items.push(pick(pool).id);
+    p.items.push(pool[pickItemIndexByRarity(pool, rnd)].id); // アプリと同じく出やすさ（★）に比例
     if (p.items.length > 3) p.items.shift();
+  };
+
+  // 防御シールド：相手が持っていれば、妨害カードを 1 回だけ自動で無効化（シールドは消える）
+  const shielded = (op: Player) => {
+    const k = op.items.indexOf(SHIELD_ID);
+    if (k < 0) return false;
+    op.items.splice(k, 1);
+    return true;
   };
 
   // 「すぐ使う」系のアイテム（自分の番でなくても使える想定）
@@ -238,31 +281,29 @@ const playGame = (sc: Scenario): GameResult => {
       me.fromItems += -me.money;
       me.money = 0;
     }
-    if (canUse('i_money_swap') && op.money > me.money + 1000 && me.items.includes('i_money_swap')) {
-      takeItem(me, 'i_money_swap');
+    if (canUse('i_money_swap') && op.money > me.money + 1000 && takeItem(me, 'i_money_swap') && !shielded(op)) {
       const d = op.money - me.money;
       me.fromItems += d;
       op.fromItems -= d;
       [me.money, op.money] = [op.money, me.money];
     }
-    if (canUse('i_money_split') && me.money >= 0 && op.money > me.money + 1000 && takeItem(me, 'i_money_split')) {
+    if (canUse('i_money_split') && me.money >= 0 && op.money > me.money + 1000 && takeItem(me, 'i_money_split') && !shielded(op)) {
       const half = Math.floor((me.money + op.money) / 2);
       me.fromItems += half - me.money;
       op.fromItems += half - op.money;
       me.money = half;
       op.money = half;
     }
-    if (canUse('i_money_reset') && op.money > 1000 && takeItem(me, 'i_money_reset')) {
+    if (canUse('i_money_reset') && op.money > 1000 && takeItem(me, 'i_money_reset') && !shielded(op)) {
       op.fromItems -= op.money;
       op.money = 0;
     }
-    if (canUse('i_treat') && takeItem(me, 'i_treat')) applyMoney(op, -TREAT_COST, 'fromItems');
-    if (canUse('i_bomby_pass') && bomby === i && takeItem(me, 'i_bomby_pass')) bomby = other(i); // シールドは効果なし（アプリの現状）
-    if (canUse('i_item_steal') && op.items.length > 0 && takeItem(me, 'i_item_steal')) {
+    if (canUse('i_treat') && takeItem(me, 'i_treat') && !shielded(op)) applyMoney(op, -TREAT_COST, 'fromItems');
+    if (canUse('i_bomby_pass') && bomby === i && takeItem(me, 'i_bomby_pass') && !shielded(op)) bomby = other(i);
+    if (canUse('i_item_steal') && op.items.length > 0 && takeItem(me, 'i_item_steal') && !shielded(op)) {
       const k = Math.floor(rnd() * op.items.length);
       me.items.push(op.items.splice(k, 1)[0]);
     }
-    // ダイス-2・防御シールドは、アプリで効果が反映されていないので「持っているだけ」
   };
 
   while (true) {
@@ -275,7 +316,7 @@ const playGame = (sc: Scenario): GameResult => {
     let move: number;
     if (canUse('i_dice_double') && takeItem(P[rep], 'i_dice_double')) move = dice() + dice();
     else if (canUse('i_dice_plus2') && takeItem(P[rep], 'i_dice_plus2')) move = dice() + 2;
-    else move = Array.from({ length: sc.diceCount ?? 1 }, dice).reduce((a, b) => a + b, 0);
+    else move = Array.from({ length: sc.twoDiceFromHalf && pos >= goal / 2 ? 2 : (sc.diceCount ?? 1) }, dice).reduce((a, b) => a + b, 0);
     const from = pos;
     pos = Math.min(goal, pos + move);
     minutes += (pos - from) * TRAVEL_MIN_PER_STATION;
@@ -304,7 +345,7 @@ const playGame = (sc: Scenario): GameResult => {
       if (mine.type === 'red') {
         if (canUse('i_mission_pass') && takeItem(me, 'i_mission_pass')) effects[i] = 'pass';
         else if (canUse('i_station_skip') && takeItem(me, 'i_station_skip')) effects[i] = 'skip';
-        else if (canUse('i_mission_share') && !shared && i === rep && takeItem(me, 'i_mission_share')) opM = myM; // 相手も同じ赤ミッションに
+        else if (canUse('i_mission_share') && !shared && i === rep && takeItem(me, 'i_mission_share') && !shielded(P[other(rep)])) opM = myM; // 相手も同じ赤ミッションに
       } else if ((mine.type === 'blue' || mine.type === 'green') && canUse('i_reward_double') && takeItem(me, 'i_reward_double')) {
         effects[i] = 'double';
       }
@@ -314,7 +355,7 @@ const playGame = (sc: Scenario): GameResult => {
     if (!skipped) {
       const succ = (m: Mission) => rnd() < sc.successRate[Math.min(3, Math.max(1, m.difficulty)) - 1];
       let mySuccess = succ(myM);
-      const opSuccess = shared ? mySuccess && rnd() < 0.9 : succ(opM); // 協力は同じ結果になりやすい
+      const opSuccess = shared ? mySuccess : succ(opM); // 協力は 2 人で 1 つの結果
       // ミッションフリーパスはアプリの現状では「代表者（判定を入力する人）」にしか効かない
       if (!mySuccess && effects[rep] === 'pass') mySuccess = true;
       const r = P[rep];
@@ -418,10 +459,17 @@ const playGame = (sc: Scenario): GameResult => {
     // ---- 貧乏神の悪行（入札の後。ゴールした回はなし）
     if (bomby !== -1) {
       bombyTurnsTotal++;
+      holderLog.push(bomby);
       const v = P[bomby];
       v.bombyTurns++;
+      const opp = P[other(bomby)];
+      const cb = sc.bombyComeback;
       const r = rnd() * 100;
-      if (r < 5) {
+      if (cb && assets(v) <= assets(opp) - cb.gap && rnd() < cb.prob) {
+        comebackEvents++;
+        if (cb.kind === 'jump') bomby = other(bomby);
+        else applyMoney(v, cb.gift ?? 0, 'fromBomby');
+      } else if (r < 5) {
         kingEvents++;
         v.kingHits++;
         if (v.props.length > 0) {
@@ -459,6 +507,8 @@ const playGame = (sc: Scenario): GameResult => {
     leadChanges,
     players: P,
     kingEvents,
+    comebackEvents,
+    holderLog,
     bombyTurnsTotal,
     propertyBuys,
     itemWins,
@@ -548,6 +598,24 @@ for (const sc of SCENARIOS) {
       turnsPerGame: +mean(games.map((g) => g.bombyTurnsTotal)).toFixed(2),
       kingPerGame: +mean(games.map((g) => g.kingEvents)).toFixed(3),
       gamesWithKing: share(games.filter((g) => g.kingEvents > 0).length, N),
+      // 同じ人に憑き続けた最長ターン数（平均）
+      longestStreak: +mean(
+        games.map((g) => {
+          let best = 0;
+          let run = 0;
+          g.holderLog.forEach((h, k) => {
+            run = k > 0 && g.holderLog[k - 1] === h ? run + 1 : 1;
+            best = Math.max(best, run);
+          });
+          return best;
+        }),
+      ).toFixed(2),
+      // 貧乏神が憑いていたターンのうち、最終的に負けた人に憑いていた割合
+      loserShare: share(
+        games.reduce((s, g) => s + g.holderLog.filter((h) => g.winner !== -1 && h !== g.winner).length, 0),
+        games.reduce((s, g) => s + g.holderLog.length, 0),
+      ),
+      comebackEventsPerGame: +mean(games.map((g) => g.comebackEvents)).toFixed(2),
     },
     debtEverRate: share(players.filter((p) => p.wasInDebt).length, players.length),
     itemsUsedPerPlayer: +mean(players.map((p) => p.itemsUsed.length)).toFixed(2),
