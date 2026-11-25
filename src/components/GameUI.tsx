@@ -69,8 +69,8 @@ export const PlayerCards: React.FC<{
   const [detailPlayer, setDetailPlayer] = useState<'me' | 'opponent' | null>(null);
   const [slide, setSlide] = useState(0);
   const slides = [
-    { key: 'me' as const, player: me, uid: userId, label: me?.name ? `${me.name}（あなた）` : 'あなた', color: '#e5367a', accent: '#ff9ec7', dark: '#b0275f', isTurn: isMyTurn },
-    { key: 'opponent' as const, player: opponent, uid: opponentId, label: opponent?.name ?? 'あいて', color: '#1e6fd9', accent: '#8cc4ff', dark: '#1553a5', isTurn: !isMyTurn && !!opponent },
+    { key: 'me' as const, player: me, uid: userId, label: me?.name ?? 'あなた', who: 'あなた', color: '#e5367a', accent: '#ff9ec7', dark: '#b0275f', isTurn: isMyTurn },
+    { key: 'opponent' as const, player: opponent, uid: opponentId, label: opponent?.name ?? 'あいて', who: 'あいて', color: '#1e6fd9', accent: '#8cc4ff', dark: '#1553a5', isTurn: !isMyTurn && !!opponent },
   ];
 
   const renderDetailModal = () => {
@@ -147,7 +147,8 @@ export const PlayerCards: React.FC<{
                 boxShadow: slide === i ? `0 3px 0 ${sl.dark}` : '0 1px 0 rgba(0,0,0,0.08)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
               }}
             >
-              🚃 {sl.label}{sl.isTurn ? ' 🎲' : ''}
+              <div style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>🚃 {sl.label}{sl.isTurn ? ' 🎲' : ''}</div>
+              <div style={{ fontSize: '0.65rem', opacity: 0.85 }}>{sl.who}</div>
             </button>
           ))}
         </div>
@@ -196,9 +197,9 @@ export const PlayerCards: React.FC<{
                 )}
                 {p && (
                   <div style={{ background: '#fff', borderRadius: 14, padding: '10px 14px', marginTop: 6, boxShadow: '0 2px 0 rgba(0,0,0,0.05)' }}>
-                    <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between' }}>
-                      <span style={{ fontWeight: 900, fontSize: '1.35rem', color: (p.money || 0) < 0 ? '#e74c3c' : '#27ae60' }}>💰 {(p.money ?? START_MONEY).toLocaleString()}円</span>
-                      <span style={{ fontWeight: 800, fontSize: '0.85rem', color: '#636e72' }}>総資産 {total.toLocaleString()}円</span>
+                    <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', flexWrap: 'wrap', columnGap: 8 }}>
+                      <span style={{ fontWeight: 900, fontSize: '1.25rem', whiteSpace: 'nowrap', color: (p.money || 0) < 0 ? '#e74c3c' : '#27ae60' }}>💰 {(p.money ?? START_MONEY).toLocaleString()}円</span>
+                      <span style={{ fontWeight: 800, fontSize: '0.8rem', color: '#636e72', whiteSpace: 'nowrap' }}>総資産 {total.toLocaleString()}円</span>
                     </div>
                     <div style={{ display: 'flex', gap: 12, marginTop: 6, fontSize: '0.9rem', fontWeight: 800, color: '#57606f', flexWrap: 'wrap' }}>
                       <span>🏠 {p.properties?.length || 0}件</span>
