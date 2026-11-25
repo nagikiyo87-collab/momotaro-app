@@ -281,7 +281,7 @@ export const ITEMS: Item[] = [
   { id: 'i_mission_share', name: '道連れカード', description: '自分の赤マスミッションを、相手にも連帯させる', type: 'attack', rarity: 2 },
 
   // 自身強化・便利系
-  { id: 'i_dice_double', name: 'サイコロ2個振り', description: '今回の移動時、サイコロを2個振れる（特急）', type: 'support', rarity: 3 },
+  { id: 'i_dice_double', name: 'サイコロ2個振り', description: '今回の移動でサイコロを1個増やす（前半は2個、後半に2個を選べば3個）', type: 'support', rarity: 3 },
   { id: 'i_mission_reroll', name: 'ミッション再抽選', description: '自分のミッションお題を別のものにチェンジする', type: 'support', rarity: 3 },
   { id: 'i_lottery', name: '宝くじカード', description: 'リアルでスクラッチ等を購入。当せん金×100倍をゲット', type: 'support', rarity: 1 },
   { id: 'i_station_skip', name: '駅スキップ', description: '今いる駅のミッションを破棄し、強制的に次の駅へ進む', type: 'support', rarity: 2 },
@@ -318,3 +318,23 @@ export const pickItemIndexByRarity = (pool: Item[], rand: () => number = Math.ra
   }
   return pool.length - 1;
 };
+
+// ==========================================
+// 💰 お金のルール（2026-11-25 シミュレーション結果を受けて変更）
+// ==========================================
+/** 最初の所持金（以前は 3,000 円。7 割の人が借金で終わっていた） */
+export const START_MONEY = 10000;
+/** 決算（物件の収益を受け取る）季節。年 2 回 */
+export const SETTLEMENT_SEASONS = ['summer', 'winter'];
+/** 借金の利息。冬の決算時だけ、借金の 10% */
+export const DEBT_INTEREST_RATE = 0.1;
+export const DEBT_INTEREST_SEASON = 'winter';
+
+// ==========================================
+// 😈 貧乏神の逆転要素（2026-11-25 ユーザー決定）
+// ==========================================
+/**
+ * 貧乏神が憑いている人が、相手より総資産で gap 円以上負けているとき、
+ * 貧乏神の番に prob の確率で「改心」して、悪さをする代わりに gift 円をくれる
+ */
+export const BOMBY_REFORM = { gap: 3000, prob: 0.25, gift: 3000 };

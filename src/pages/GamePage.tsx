@@ -78,7 +78,6 @@ export const GamePage: React.FC<Props> = ({ roomId, userId }) => {
   useEffect(() => {
     if (phase !== 'bidding') { actions.setSelectedPropertyId(''); actions.setBidAmount(0); }
     if (phase !== 'spending') { actions.setSpentInput(''); } 
-    if (phase === 'dice') { actions.setActiveItemEffect(null); }
   }, [phase]);
 
   if (loading) return <div style={{ textAlign: 'center', marginTop: '50px' }}>🔄 データを読み込み中...</div>;
@@ -273,8 +272,20 @@ export const GamePage: React.FC<Props> = ({ roomId, userId }) => {
                         <button className="btn-pop btn-green" disabled>
                           🚃 {actions.pendingDiceTotal}マス進みます…
                         </button>
+                      ) : actions.canChooseDiceCount && isMyTurn && opponent && !actions.isRollingDice ? (
+                        // 後半（折り返し以降）は、サイコロを 1 個か 2 個か選べる
+                        <div>
+                          <p style={{ margin: '0 0 10px 0', fontWeight: 800, color: '#57606f', fontSize: '0.9rem' }}>
+                            後半はサイコロの数を選べます
+                            {actions.activeItemEffect === 'i_dice_double' && '（2個振りカードで +1個）'}
+                          </p>
+                          <div style={{ display: 'flex', gap: '10px' }}>
+                            <button className="btn-pop" onClick={() => actions.handleRollDice(1)}>🎲 1個で振る</button>
+                            <button className="btn-pop btn-blue" onClick={() => actions.handleRollDice(2)}>🎲🎲 2個で振る</button>
+                          </div>
+                        </div>
                       ) : (
-                        <button className="btn-pop" onClick={actions.handleRollDice} disabled={!isMyTurn || !opponent || actions.isRollingDice}>
+                        <button className="btn-pop" onClick={() => actions.handleRollDice(1)} disabled={!isMyTurn || !opponent || actions.isRollingDice}>
                           {actions.isRollingDice ? '🎲 サイコロ回転中...' : (!opponent ? '相手を待っています' : 'サイコロを振る')}
                         </button>
                       )}

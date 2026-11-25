@@ -31,6 +31,7 @@ type Scenario = {
   interestOnlyWinter?: boolean; // 利息を冬の決算時だけにする
   settleSeasons?: number[]; // 決算する季節（0 春 1 夏 2 秋 3 冬）
   twoDiceFromHalf?: boolean; // 折り返し（全体の半分）を過ぎたらサイコロ 2 個
+  chooseTwoInSecondHalf?: number; // 後半は 1 個か 2 個を選べる：2 個を選ぶ確率
   // 貧乏神の逆転要素：憑かれている人が総資産で gap 円以上負けているとき、prob の確率で
   // jump＝相手に乗り移る（悪行なし）／ gift＝改心してお金をくれる（悪行の代わりに +gift 円）
   bombyComeback?: { gap: number; prob: number; kind: 'jump' | 'gift'; gift?: number };
@@ -92,6 +93,17 @@ const SCENARIOS: Scenario[] = [
     interestOnlyWinter: true,
     settleSeasons: [1, 3],
     bombyComeback: { gap: 3000, prob: 0.25, kind: 'jump' },
+  },
+  {
+    ...BASE,
+    id: 'v2',
+    label: '【v2 採用ルール】お金の改善 3 点＋後半は 1 個か 2 個を選べる（半々）＋貧乏神の改心',
+    startMoney: 10000,
+    interestRate: 0.1,
+    interestOnlyWinter: true,
+    settleSeasons: [1, 3],
+    chooseTwoInSecondHalf: 0.5,
+    bombyComeback: { gap: 3000, prob: 0.25, kind: 'gift', gift: 3000 },
   },
   {
     ...BASE,
@@ -314,9 +326,15 @@ const playGame = (sc: Scenario): GameResult => {
 
     // ---- サイコロ（代表者のカードのみ有効。アプリと同じく 1 ターン 1 枚）
     let move: number;
-    if (canUse('i_dice_double') && takeItem(P[rep], 'i_dice_double')) move = dice() + dice();
-    else if (canUse('i_dice_plus2') && takeItem(P[rep], 'i_dice_plus2')) move = dice() + 2;
-    else move = Array.from({ length: sc.twoDiceFromHalf && pos >= goal / 2 ? 2 : (sc.diceCount ?? 1) }, dice).reduce((a, b) => a + b, 0);
+    // 基本の個数：既定 1 個／後半は選べる／折り返しから 2 個 など
+    let count = sc.diceCount ?? 1;
+    if (sc.twoDiceFromHalf && pos >= goal / 2) count = 2;
+    if (sc.chooseTwoInSecondHalf !== undefined && pos >= goal / 2) count = rnd() < sc.chooseTwoInSecondHalf ? 2 : 1;
+    // 「サイコロ2個振り」は 1 個増やす。ダイス+2 は出目に +2（アプリと同じく 1 ターン 1 枚）
+    let bonus = 0;
+    if (canUse('i_dice_double') && takeItem(P[rep], 'i_dice_double')) count += 1;
+    else if (canUse('i_dice_plus2') && takeItem(P[rep], 'i_dice_plus2')) bonus = 2;
+    move = Array.from({ length: count }, dice).reduce((a, b) => a + b, 0) + bonus;
     const from = pos;
     pos = Math.min(goal, pos + move);
     minutes += (pos - from) * TRAVEL_MIN_PER_STATION;

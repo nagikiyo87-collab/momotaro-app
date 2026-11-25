@@ -1,5 +1,6 @@
 import { doc, setDoc, getDoc, updateDoc } from 'firebase/firestore';
 import { db } from '../firebase';
+import { START_MONEY } from '../data/gameData';
 
 export const useGameActions = () => {
   
@@ -21,7 +22,7 @@ export const useGameActions = () => {
         players: {
           [userId]: { 
             name: playerName, 
-            money: 3000, 
+            money: START_MONEY, 
             properties: [],
             items: ['i_dice_plus2'] // 🔑 初期アイテムを追加
           }
@@ -53,7 +54,7 @@ export const useGameActions = () => {
       await updateDoc(roomRef, {
         [`players.${userId}`]: { 
           name: playerName, 
-          money: 3000, 
+          money: START_MONEY, 
           properties: [],
           items: ['i_dice_plus2'] // 🔑 初期アイテムを追加
         },

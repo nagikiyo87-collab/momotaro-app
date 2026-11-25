@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { QRCodeSVG } from 'qrcode.react';
-import { STATIONS, ITEMS, type Mission, type Property } from '../data/gameData';
+import { STATIONS, ITEMS, START_MONEY, type Mission, type Property } from '../data/gameData';
 import { useModal } from '../contexts/ModalContext';
 import { doc, updateDoc } from 'firebase/firestore';
 import { db } from '../firebase';
@@ -130,7 +130,7 @@ export const PlayerCards: React.FC<{
             <h3 style={{ margin: '0 0 10px 0', fontSize: '1.1rem', color: '#2f3542', fontWeight: '800' }}>
               👤 {me?.name || 'あなた'} {bombyPossessedId === userId && <span title="貧乏神が憑依中！">{getBombyIcon(bombyType)}</span>}
             </h3>
-            <p style={{ margin: '5px 0', color: (me?.money || 0) < 0 ? '#e74c3c' : '#27ae60', fontWeight: '800', fontSize: '1.3rem' }}>💰 {me?.money?.toLocaleString() || 3000}円</p>
+            <p style={{ margin: '5px 0', color: (me?.money || 0) < 0 ? '#e74c3c' : '#27ae60', fontWeight: '800', fontSize: '1.3rem' }}>💰 {me?.money?.toLocaleString() ?? START_MONEY.toLocaleString()}円</p>
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.9rem', color: '#747d8c', marginTop: '10px', background: 'rgba(241, 242, 246, 0.8)', padding: '6px 10px', borderRadius: '8px', fontWeight: 'bold' }}>
               <span>🏠 {me?.properties?.length || 0}件</span>
               <span>🎒 {me?.items?.length || 0}/3 個</span>
@@ -154,7 +154,7 @@ export const PlayerCards: React.FC<{
               <div style={{ margin: '15px 0' }}><QRCodeSVG value={inviteUrl} size={90} /></div>
             ) : (
               <>
-                <p style={{ margin: '5px 0', color: (opponent?.money || 0) < 0 ? '#e74c3c' : '#27ae60', fontWeight: '800', fontSize: '1.3rem' }}>💰 {opponent?.money?.toLocaleString() || 3000}円</p>
+                <p style={{ margin: '5px 0', color: (opponent?.money || 0) < 0 ? '#e74c3c' : '#27ae60', fontWeight: '800', fontSize: '1.3rem' }}>💰 {opponent?.money?.toLocaleString() ?? START_MONEY.toLocaleString()}円</p>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.9rem', color: '#747d8c', marginTop: '10px', background: 'rgba(241, 242, 246, 0.8)', padding: '6px 10px', borderRadius: '8px', fontWeight: 'bold' }}>
                   <span>🏠 {opponent?.properties?.length || 0}件</span>
                   <span>🎒 {opponent?.items?.length || 0}/3 個</span>

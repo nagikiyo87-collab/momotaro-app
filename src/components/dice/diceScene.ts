@@ -293,7 +293,7 @@ export class DiceScene {
       return;
     }
     const t = Math.tan(THREE.MathUtils.degToRad(this.camera.fov / 2));
-    const width = this.count > 1 ? 4.6 : 3.4;
+    const width = this.count > 2 ? 5.8 : this.count > 1 ? 4.6 : 3.4; // 1 個・2 個・3 個
     const dist = Math.max(width / (2 * t * this.camera.aspect), 3.4 / (2 * t));
     // 見下ろす角度は約 35°（真上に近いと上の面しか見えず平たく見える）
     const dir = new THREE.Vector3(0, 0.57, 0.82).normalize();
@@ -459,7 +459,7 @@ export class DiceScene {
       } else {
         // カメラのすぐ近く（高い所）から、回転しながら画面の真ん中へ落ちてくる。
         // 近いほど大きく見えるので、飛び込んでくる迫力が出る
-        const xOff = count > 1 ? (i - 0.5) * 1.5 : 0;
+        const xOff = (i - (count - 1) / 2) * 1.5; // 複数のときは横に並べて投げる
         body.position.set(xOff + 0.6 + rand() * 0.4, 4.2 + rand() * 0.8 + i * 0.3, zMid + 0.8 + (rand() - 0.5) * 0.6);
         body.velocity.set(-(1.2 + rand() * 1.2), 1 + rand() * 1.5, -(1.2 + rand() * 1.0));
       }

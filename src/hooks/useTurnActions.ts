@@ -1,12 +1,14 @@
 import { useState, useEffect } from 'react';
-import { doc, updateDoc } from 'firebase/firestore';
+import { doc, updateDoc, deleteField } from 'firebase/firestore';
 import { db } from '../firebase';
-import { STATIONS, MISSIONS, ITEMS, SHIELD_ID, isAttackItem, pickItemIndexByRarity, type Mission, type Property } from '../data/gameData';
+import { STATIONS, MISSIONS, ITEMS, SHIELD_ID, isAttackItem, pickItemIndexByRarity, SETTLEMENT_SEASONS, DEBT_INTEREST_RATE, DEBT_INTEREST_SEASON, BOMBY_REFORM, type Mission, type Property } from '../data/gameData';
 import { useModal } from '../contexts/ModalContext';
 import { ITEM_REGISTRY } from '../game/items/itemRegistry';
 import type { ItemContext } from '../game/items/types';
 
 const STAY_TIMES = [30, 45, 60];
+// ミッションの結果で効果が出て、使い切りになるカード
+const MISSION_EFFECTS = ['i_reward_double', 'i_mission_pass'];
 const SEASONS = ['spring', 'summer', 'autumn', 'winter'];
 
 export const useTurnActions = (
@@ -17,7 +19,10 @@ export const useTurnActions = (
 
   const [selectedPropertyId, setSelectedPropertyId] = useState<string>('');
   const [bidAmount, setBidAmount] = useState<number>(0);
-  const [activeItemEffect, setActiveItemEffect] = useState<string | null>(null);
+  // 使ったカードの効果（報酬2倍・フリーパス・サイコロ系）。部屋のデータに置き、2 台で同じものを見る
+  // （以前はスマホの中だけにあり、開き直すと消える・相手が使った効果が判定に使われない不具合があった）
+  const activeItemEffect: string | null = roomData?.activeEffects?.[userId] ?? null;
+  const opponentEffect: string | null = opponentId ? roomData?.activeEffects?.[opponentId] ?? null : null;
   const [spentInput, setSpentInput] = useState<string>('');
   
   const [dest1, setDest1] = useState<string>('');
@@ -38,6 +43,8 @@ export const useTurnActions = (
   const [displayRoulette, setDisplayRoulette] = useState<number | null>(null);
 
   const sharedPosition = roomData?.sharedPosition || 0;
+  // 後半（折り返し以降）は、サイコロを 1 個か 2 個か選べる（2026-11-25 ユーザー決定）
+  const canChooseDiceCount = sharedPosition >= (STATIONS.length - 1) / 2;
   const currentYear = roomData?.year || 1;
   const currentSeason = roomData?.season || 'spring';
   const bombyPossessedId = roomData?.bombyPossessedId;
@@ -82,10 +89,15 @@ export const useTurnActions = (
     return { newMoney, remainingProperties, soldNames };
   };
 
-  const handleRollDice = async () => {
+  /**
+   * サイコロを振る。diceCount は後半（折り返し以降）に選べる個数（前半は 1 個）。
+   * 「サイコロ2個振り」カードは、選んだ個数に 1 個足す（後半に 2 個を選べば 3 個）
+   */
+  const handleRollDice = async (diceCount: 1 | 2 = 1) => {
     if (!opponentId || isRollingDice || pendingDiceTotal !== null) return;
     const roll = () => Math.floor(Math.random() * 6) + 1;
-    const values = activeItemEffect === 'i_dice_double' ? [roll(), roll()] : [roll()];
+    const count = (canChooseDiceCount ? diceCount : 1) + (activeItemEffect === 'i_dice_double' ? 1 : 0);
+    const values = Array.from({ length: count }, roll);
     // 「ダイス+2カード」は振る前に使い、移動の出目に +2 する（2026-11-24 ユーザー確認）
     const bonus = activeItemEffect === 'i_dice_plus2' ? 2 : 0;
     const finalTotal = values.reduce((a, b) => a + b, 0) + bonus;
@@ -98,6 +110,10 @@ export const useTurnActions = (
       pendingDiceBonus: bonus,
       diceRollKey: Date.now(),
       diceSeed: Math.floor(Math.random() * 2 ** 31),
+      // サイコロ系のカードはここで使い切り
+      ...(activeItemEffect === 'i_dice_double' || activeItemEffect === 'i_dice_plus2'
+        ? { [`activeEffects.${userId}`]: deleteField() }
+        : {}),
     }).catch(console.error);
   };
 
@@ -114,8 +130,6 @@ export const useTurnActions = (
       sharedPosition: nextPosition, lastDiceRoll: pendingDiceTotal, phase: 'roulette', isRollingDice: false, pendingDiceTotal: null,
       pendingDiceValues: null, pendingDiceBonus: 0,
     }).catch(console.error);
-    
-    setActiveItemEffect(null);
   };
 
   const handleUseItem = async (itemId: string, index: number) => {
@@ -157,8 +171,7 @@ export const useTurnActions = (
     const newItems = [...(me?.items || [])];
     newItems.splice(index, 1);
     const updates: any = { [`players.${userId}.items`]: newItems, ...result.updates };
-    
-    if (result.activeEffect) setActiveItemEffect(result.activeEffect);
+    if (result.activeEffect) updates[`activeEffects.${userId}`] = result.activeEffect;
     if (result.message) await showAlert(result.message);
     
     // 🔑 awaitを外す
@@ -245,20 +258,31 @@ export const useTurnActions = (
     let actualMySuccess = mySuccess;
     let passMsg = '';
     if (!mySuccess && activeItemEffect === 'i_mission_pass') { actualMySuccess = true; passMsg = `\n🎟️ ミッションフリーパスの効果で、無条件クリア扱いになりました！`; }
-    if (actualMySuccess && opponentSuccess) triggerConfetti();
+    // 相手が使ったフリーパスも効く
+    let actualOpSuccess = opponentSuccess;
+    let opPassMsg = '';
+    if (!opponentSuccess && opponentEffect === 'i_mission_pass') { actualOpSuccess = true; opPassMsg = `\n🎟️ ミッションフリーパスの効果で、無条件クリア扱いになりました！`; }
+    // 協力ミッションは 2 人で 1 つの結果。どちらかのフリーパスで 2 人ともクリア
+    if (myMission.type === 'green' && opponentMission.type === 'green' && (actualMySuccess || actualOpSuccess)) { actualMySuccess = true; actualOpSuccess = true; }
+    if (actualMySuccess && actualOpSuccess) triggerConfetti();
 
     let myMoneyChange = 0; let opponentMoneyChange = 0;
     let newBombyId = bombyPossessedId; 
     const myNewItems: string[] = [...(me?.items || [])];
     const opponentNewItems: string[] = [...(opponent?.items || [])];
-    let myItemMsg = passMsg; let opponentItemMsg = '';
+    let myItemMsg = passMsg; let opponentItemMsg = opPassMsg;
     let availableItems = [...ITEMS];
 
     if (actualMySuccess) {
       let reward = myMission.reward || 0;
       if (activeItemEffect === 'i_reward_double') { reward *= 2; myItemMsg += `\n💰 報酬2倍カードの効果で獲得金額が2倍！`; }
       if (myMission.type === 'blue') myMoneyChange += reward;
-      if (myMission.type === 'green') { myMoneyChange += reward; opponentMoneyChange += myMission.reward; }
+      if (myMission.type === 'green') {
+        myMoneyChange += reward;
+        // 相手が報酬2倍を使っていれば、相手の取り分も 2 倍
+        opponentMoneyChange += opponentEffect === 'i_reward_double' ? myMission.reward * 2 : myMission.reward;
+        if (opponentEffect === 'i_reward_double') opponentItemMsg += `\n💰 報酬2倍カードの効果で獲得金額が2倍！`;
+      }
     } else {
       if (myMission.type === 'red') {
         if (myMission.penaltyType === 'half_money') {
@@ -268,8 +292,12 @@ export const useTurnActions = (
       }
     }
 
-    if (opponentSuccess) {
-      if (opponentMission.type === 'blue') opponentMoneyChange += opponentMission.reward;
+    if (actualOpSuccess) {
+      if (opponentMission.type === 'blue') {
+        const opReward = opponentEffect === 'i_reward_double' ? opponentMission.reward * 2 : opponentMission.reward;
+        if (opponentEffect === 'i_reward_double') opponentItemMsg += `\n💰 報酬2倍カードの効果で獲得金額が2倍！`;
+        opponentMoneyChange += opReward;
+      }
       if (opponentMission.type === 'green' && myMission.type !== 'green') { myMoneyChange += opponentMission.reward; opponentMoneyChange += opponentMission.reward; }
     } else {
       if (opponentMission.type === 'red') {
@@ -287,7 +315,7 @@ export const useTurnActions = (
         myItemMsg += `\n🎁 アイテムマス効果:「${randomItem.name}」をGET！`; 
         if (myNewItems.length > 3) myItemMsg += `\n⚠️ カバンがいっぱいです！次へ進む前に1つ捨ててください。`;
       }
-      if (opponentSuccess) {
+      if (actualOpSuccess) {
         const idx = pickItemIndexByRarity(availableItems);
         const randomItem = availableItems[idx]; availableItems.splice(idx, 1); opponentNewItems.push(randomItem.id); 
         opponentItemMsg += `\n🎁 アイテムマス効果:「${randomItem.name}」をGET！`; 
@@ -311,9 +339,9 @@ export const useTurnActions = (
     const myResult = processDebtAndSales(me?.money || 0, me?.properties || [], myMoneyChange);
     const opResult = processDebtAndSales(opponent?.money || 0, opponent?.properties || [], opponentMoneyChange);
 
-    if (!actualMySuccess && opponentSuccess) newBombyId = userId; 
-    else if (actualMySuccess && !opponentSuccess) newBombyId = opponentId; 
-    else if (!actualMySuccess && !opponentSuccess) newBombyId = Math.random() < 0.5 ? userId : opponentId; 
+    if (!actualMySuccess && actualOpSuccess) newBombyId = userId; 
+    else if (actualMySuccess && !actualOpSuccess) newBombyId = opponentId; 
+    else if (!actualMySuccess && !actualOpSuccess) newBombyId = Math.random() < 0.5 ? userId : opponentId; 
 
     let alertMsg = `【ミッション結果】\nあなた: ${myMoneyChange >= 0 ? '+' : ''}${myMoneyChange}円${myItemMsg}\nあいて: ${opponentMoneyChange >= 0 ? '+' : ''}${opponentMoneyChange}円${opponentItemMsg}\n`;
     alertMsg += destPenaltyMsg; 
@@ -330,13 +358,15 @@ export const useTurnActions = (
     
     // UIアラート待機はそのまま
     await showAlert(alertMsg);
-    setActiveItemEffect(null); 
 
     // 🔑 awaitを外す
     updateDoc(doc(db, 'rooms', roomId), {
       [`players.${userId}.money`]: myResult.newMoney, [`players.${userId}.properties`]: myResult.remainingProperties, [`players.${userId}.items`]: myNewItems,
       [`players.${opponentId}.money`]: opResult.newMoney, [`players.${opponentId}.properties`]: opResult.remainingProperties, [`players.${opponentId}.items`]: opponentNewItems,
-      bombyPossessedId: newBombyId, bombyType: nextBombyType, phase: 'spending', spendings: {} 
+      bombyPossessedId: newBombyId, bombyType: nextBombyType, phase: 'spending', spendings: {},
+      // ミッション系のカード（報酬2倍・フリーパス）は 2 人ともここで使い切り
+      ...(activeItemEffect && MISSION_EFFECTS.includes(activeItemEffect) ? { [`activeEffects.${userId}`]: deleteField() } : {}),
+      ...(opponentEffect && MISSION_EFFECTS.includes(opponentEffect) ? { [`activeEffects.${opponentId}`]: deleteField() } : {}),
     }).catch(console.error);
   };
 
@@ -437,17 +467,24 @@ export const useTurnActions = (
     const currentSeasonIndex = SEASONS.indexOf(currentSeason);
     let nextSeasonIndex = currentSeasonIndex + 1; let nextYear = currentYear;
 
-    if (currentSeason === 'winter') {
-      nextSeasonIndex = 0; nextYear += 1;       
+    if (currentSeason === 'winter') { nextSeasonIndex = 0; nextYear += 1; }
+
+    // 決算は年 2 回（夏・冬）。物件の収益を受け取る
+    if (SETTLEMENT_SEASONS.includes(currentSeason)) {
       const calculateIncome = (props: Property[]) => props.reduce((sum, prop) => sum + Math.floor(prop.price * (prop.rate / 100)), 0);
       const myIncome = calculateIncome(myProperties); const opponentIncome = calculateIncome(opponentProperties);
-      myNewMoney += myIncome; opponentNewMoney += opponentIncome; 
-      alertMessage += `\n\n🌸🌸🌸 決算ボーナス 🌸🌸🌸\n1年間の収益が振り込まれました！\nあなた: +${myIncome}円\nあいて: +${opponentIncome}円`;
+      myNewMoney += myIncome; opponentNewMoney += opponentIncome;
+      const seasonName = currentSeason === 'summer' ? '夏' : '冬';
+      alertMessage += `\n\n🌸🌸🌸 ${seasonName}の決算 🌸🌸🌸\n半年分の収益が振り込まれました！\nあなた: +${myIncome}円\nあいて: +${opponentIncome}円`;
     }
 
+    // 借金の利息は冬の決算時だけ（以前は毎ターン 20%。借金が雪だるま式に増えていた）
     let myDebtMsg = ''; let opDebtMsg = '';
-    if (myNewMoney < 0) { const interest = Math.floor(Math.abs(myNewMoney) * 0.2); myNewMoney -= interest; myDebtMsg = `\n💀 借金利息(20%): あなた -${interest}円 (総借金: ${myNewMoney}円)`; }
-    if (opponentNewMoney < 0) { const interest = Math.floor(Math.abs(opponentNewMoney) * 0.2); opponentNewMoney -= interest; opDebtMsg = `\n💀 借金利息(20%): あいて -${interest}円 (総借金: ${opponentNewMoney}円)`; }
+    if (currentSeason === DEBT_INTEREST_SEASON) {
+      const pct = Math.round(DEBT_INTEREST_RATE * 100);
+      if (myNewMoney < 0) { const interest = Math.floor(Math.abs(myNewMoney) * DEBT_INTEREST_RATE); myNewMoney -= interest; myDebtMsg = `\n💀 借金利息(${pct}%): あなた -${interest}円 (総借金: ${myNewMoney}円)`; }
+      if (opponentNewMoney < 0) { const interest = Math.floor(Math.abs(opponentNewMoney) * DEBT_INTEREST_RATE); opponentNewMoney -= interest; opDebtMsg = `\n💀 借金利息(${pct}%): あいて -${interest}円 (総借金: ${opponentNewMoney}円)`; }
+    }
     if (myDebtMsg || opDebtMsg) alertMessage += `\n\n💸💸💸 借金利息発生 💸💸💸${myDebtMsg}${opDebtMsg}`;
 
     await showAlert(alertMessage);
@@ -465,8 +502,19 @@ export const useTurnActions = (
 
   const handleBombyAction = async () => {
     if (!opponentId) return;
-    if (roomData?.bombyPossessedId !== userId) return; 
-    
+    if (roomData?.bombyPossessedId !== userId) return;
+
+    // 逆転要素：総資産で大きく負けているときは、たまに貧乏神が改心してお金をくれる
+    const totalAssets = (p?: { money?: number; properties?: Property[] }) => (p?.money || 0) + (p?.properties || []).reduce((s, x) => s + x.price, 0);
+    if (totalAssets(me) <= totalAssets(opponent) - BOMBY_REFORM.gap && Math.random() < BOMBY_REFORM.prob) {
+      await showAlert(`🌈🌈🌈🌈🌈🌈🌈\n\n「…なんだか かわいそうになってきたのねん。\n今回は これをあげるのねん！」\n\n貧乏神が改心して ${BOMBY_REFORM.gift.toLocaleString()}円 くれた！\n\n🌈🌈🌈🌈🌈🌈🌈`);
+      updateDoc(doc(db, 'rooms', roomId), {
+        [`players.${userId}.money`]: (me?.money || 0) + BOMBY_REFORM.gift,
+        phase: 'dice',
+      }).catch(console.error);
+      return;
+    }
+
     // 💡 テストする時はここの数字を書き換えてください
     const rand = Math.floor(Math.random() * 100);
     let newType = 'normal';
@@ -528,7 +576,7 @@ export const useTurnActions = (
 
   return {
     rouletteResult: displayRoulette,
-    selectedPropertyId, setSelectedPropertyId, bidAmount, setBidAmount, activeItemEffect, setActiveItemEffect,
+    selectedPropertyId, setSelectedPropertyId, bidAmount, setBidAmount, activeItemEffect, canChooseDiceCount,
     isRollingDice, isSpinningRoulette, isAnimatingRoulette,
     pendingDiceTotal, pendingDiceValues, pendingDiceBonus, diceRollKey, diceSeed, pendingRouletteData,
     spentInput, setSpentInput,
