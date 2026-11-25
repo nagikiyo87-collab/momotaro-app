@@ -3,7 +3,7 @@ import { useGameSync } from '../hooks/useGameSync';
 import { useTurnActions } from '../hooks/useTurnActions';
 import { STATIONS, STATION_PROPERTIES, MISSIONS, ITEMS, PASSIVE_ITEMS, getStationSquares } from '../data/gameData'; 
 import { RuleModal } from '../components/RuleModal';
-import { GameHeader, PlayerCards, GameMapView, BottomNav, SeasonalBackground, StationShopList, DestinationPhaseUI, MissionPhaseUI, SpendingPhaseUI, BiddingPhaseUI, ResultPhaseUI } from '../components/GameUI';
+import { GameHeader, PlayerCards, GameMapView, BottomNav, SeasonalBackground, StationShopList, MissionPhaseUI, SpendingPhaseUI, BiddingPhaseUI, ResultPhaseUI } from '../components/GameUI';
 import { motion, AnimatePresence } from 'framer-motion';
 import { doc, updateDoc } from 'firebase/firestore';
 import { db } from '../firebase';
@@ -102,6 +102,10 @@ export const GamePage: React.FC<Props> = ({ roomId, userId }) => {
   const currentMissions = roomData?.currentMissions || {};
   const myMission = MISSIONS.find(m => m.id === currentMissions[userId]);
   const opponentMission = opponentId ? MISSIONS.find(m => m.id === currentMissions[opponentId]) : undefined;
+
+  // 今ターンの目的地メモ。変更前の部屋は目的地 1〜3 番目をそのまま表示
+  const destinationNotes: string[] = roomData?.destinationNotes
+    ?? [roomData?.destinations?.dest1, roomData?.destinations?.dest2, roomData?.destinations?.dest3].filter(Boolean);
 
   const MISSION_ITEMS = ['i_mission_swap', 'i_mission_share', 'i_mission_reroll', 'i_reward_double', 'i_mission_pass', 'i_time_extend'];
   const BOMBY_ITEMS = ['i_bomby_pass'];
@@ -299,18 +303,11 @@ export const GamePage: React.FC<Props> = ({ roomId, userId }) => {
                     </button>
                   )}
 
+                  {/* 目的地を決めるフェーズは廃止（2026-11-25）。変更前の部屋でこの画面に止まっていたらミッションへ */}
                   {phase === 'destination' && (
-                    <DestinationPhaseUI
-                      isMyTurn={isMyTurn}
-                      dest1={actions.dest1} setDest1={actions.setDest1}
-                      dest2={actions.dest2} setDest2={actions.setDest2}
-                      dest3={actions.dest3} setDest3={actions.setDest3}
-                      savedDestinations={roomData?.destinations}
-                      onSubmit={actions.handleSubmitDestination}
-                      onStart={actions.handleConfirmDestinations}
-                      stationName={currentStationName}
-                      properties={currentProperties}
-                    />
+                    <button className="btn-pop btn-green" onClick={actions.handleSkipToMission}>
+                      🚀 ミッションへ進む
+                    </button>
                   )}
 
                   {phase === 'mission' && (
@@ -337,7 +334,9 @@ export const GamePage: React.FC<Props> = ({ roomId, userId }) => {
                         currentStationName={currentStationName} 
                         stayTime={roomData?.stayTime || 0} 
                         squareType={roomData?.squareType} 
-                        destinations={roomData?.destinations} 
+                        destinationNotes={destinationNotes}
+                        onAddNote={actions.handleAddDestinationNote}
+                        onRemoveNote={actions.handleRemoveDestinationNote}
                         myMission={myMission} 
                         opponentMission={opponentMission} 
                         opponentName={opponent?.name || '相手'} 
@@ -345,7 +344,7 @@ export const GamePage: React.FC<Props> = ({ roomId, userId }) => {
                         onEndMission={(mySuccess, opSuccess) => actions.handleEndMission(mySuccess, opSuccess, myMission, opponentMission)} 
                       />
                       {/* ミッション中も、この駅で買える物件を見られるように */}
-                      <StationShopList stationName={currentStationName} properties={currentProperties} />
+                      <StationShopList stationName={currentStationName} properties={currentProperties} onPick={actions.handleAddDestinationNote} />
                     </>
                   )}
 

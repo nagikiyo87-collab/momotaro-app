@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { doc, updateDoc, deleteField } from 'firebase/firestore';
+import { doc, updateDoc, deleteField, arrayUnion, arrayRemove } from 'firebase/firestore';
 import { db } from '../firebase';
 import { STAY_TIMES, getStationSquares, STATIONS, MISSIONS, ITEMS, SHIELD_ID, isAttackItem, pickItemIndexByRarity, SETTLEMENT_SEASONS, DEBT_INTEREST_RATE, DEBT_INTEREST_SEASON, BOMBY_REFORM, type Mission, type Property } from '../data/gameData';
 import { useModal } from '../contexts/ModalContext';
@@ -24,9 +24,6 @@ export const useTurnActions = (
   const opponentEffect: string | null = opponentId ? roomData?.activeEffects?.[opponentId] ?? null : null;
   const [spentInput, setSpentInput] = useState<string>('');
   
-  const [dest1, setDest1] = useState<string>('');
-  const [dest2, setDest2] = useState<string>('');
-  const [dest3, setDest3] = useState<string>('');
 
   const isMyTurn = roomData?.currentTurn === userId; 
   const isRollingDice = roomData?.isRollingDice || false;
@@ -185,8 +182,10 @@ export const useTurnActions = (
       stayTime,
       squareType,
       currentMissions: { [userId]: myMissionObj.id, [opponentId!]: opponentMissionObj.id },
-      phase: 'destination',
-      destinations: {},
+      // 目的地を決めるフェーズはなし（2026-11-25）。すぐミッションへ。目的地はミッション画面のメモに自由に追加
+      phase: 'mission',
+      destinationNotes: [],
+      missionTimer: { isRunning: false, remainingSeconds: stayTime * 60, endTime: null },
     };
   };
 
@@ -200,31 +199,23 @@ export const useTurnActions = (
     }).catch(console.error);
   };
 
-  const handleSubmitDestination = async () => {
-    if (isMyTurn) {
-      if (!dest1) { await showAlert('⚠️ 1番目の目的地を入力してください！'); return; }
-      // 🔑 awaitを外す
-      updateDoc(doc(db, 'rooms', roomId), {
-        'destinations.dest1': dest1,
-        'destinations.dest3': dest3 || ''
-      }).catch(console.error);
-    } else {
-      if (!dest2) { await showAlert('⚠️ 2番目の目的地を入力してください！'); return; }
-      // 🔑 awaitを外す
-      updateDoc(doc(db, 'rooms', roomId), {
-        'destinations.dest2': dest2
-      }).catch(console.error);
-    }
+  /** 今ターンの目的地メモに追加（2 人ともいつでも追加できる）。「店名 https://...」の形 */
+  const handleAddDestinationNote = (note: string) => {
+    const text = note.trim();
+    if (!text) return;
+    updateDoc(doc(db, 'rooms', roomId), { destinationNotes: arrayUnion(text) }).catch(console.error);
+  };
+  const handleRemoveDestinationNote = (note: string) => {
+    updateDoc(doc(db, 'rooms', roomId), { destinationNotes: arrayRemove(note) }).catch(console.error);
   };
 
-  const handleConfirmDestinations = async () => {
-    const time = roomData.stayTime || 30;
-    // 🔑 awaitを外す
+  /** 目的地を決める画面で止まっている古い部屋（この変更より前に作った部屋）をミッションへ進める */
+  const handleSkipToMission = () => {
+    const time = roomData?.stayTime || 30;
     updateDoc(doc(db, 'rooms', roomId), {
       phase: 'mission',
-      missionTimer: { isRunning: true, remainingSeconds: time * 60, endTime: Date.now() + time * 60 * 1000 }
+      missionTimer: { isRunning: false, remainingSeconds: time * 60, endTime: null },
     }).catch(console.error);
-    setDest1(''); setDest2(''); setDest3('');
   };
 
   const handleEndMission = async (
@@ -556,10 +547,9 @@ export const useTurnActions = (
     isRollingDice,
     pendingDiceTotal, pendingDiceValues, pendingDiceBonus, diceRollKey, diceSeed,
     spentInput, setSpentInput,
-    dest1, setDest1, dest2, setDest2, dest3, setDest3, 
     handleRollDice, handleConfirmMove, handleUseItem, handleDiscardItem, 
     handleArrive, 
-    handleSubmitDestination, handleConfirmDestinations, 
+    handleAddDestinationNote, handleRemoveDestinationNote, handleSkipToMission, 
     handleEndMission, handleSubmitSpending, handleFinishSpending, 
     handleSubmitBid, handleRevealBids, handleBombyAction,
   };

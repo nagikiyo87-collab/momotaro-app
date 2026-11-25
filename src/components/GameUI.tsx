@@ -360,105 +360,16 @@ const MissionTimer: React.FC<{ roomId: string; stayTime: number; timerData: any 
   );
 };
 
-export const DestinationPhaseUI: React.FC<{
-  isMyTurn: boolean;
-  dest1: string; setDest1: (val: string) => void;
-  dest2: string; setDest2: (val: string) => void;
-  dest3: string; setDest3: (val: string) => void;
-  savedDestinations: any; // 🔑 追加
-  onSubmit: () => void;   // 🔑 追加
-  onStart: () => void;    // 🔑 追加
-  stationName: string;
-  properties: Property[];
-}> = ({ isMyTurn, dest1, setDest1, dest2, setDest2, dest3, setDest3, savedDestinations, onSubmit, onStart, stationName, properties }) => {
-  // 物件をタップしたら、空いている目的地の欄に入れる（代表者は 1 番目→3 番目、相手は 2 番目）
-  const pickDestination = (name: string) => {
-    if (isMyTurn) {
-      if (!dest1) setDest1(name);
-      else setDest3(name);
-    } else {
-      setDest2(name);
-    }
-  };
-  
-  // DBのデータを見て、自分と相手が送信済みか判定する
-  const mySubmitted = isMyTurn ? !!savedDestinations?.dest1 : !!savedDestinations?.dest2;
-  const bothSubmitted = !!savedDestinations?.dest1 && !!savedDestinations?.dest2;
-
-  return (
-    <>
-      <h3 style={{ margin: '0 0 15px 0', color: '#8e44ad', fontWeight: '800', fontSize: '1.3rem' }}>🗺️ 目的地を決めよう！</h3>
-      <div style={{ padding: '20px', background: '#f5eef8', borderRadius: '16px', marginBottom: '15px', border: '4px solid #d2b4de', textAlign: 'left' }}>
-        
-        {!mySubmitted ? (
-          isMyTurn ? (
-            // --- 代表者の入力フォーム ---
-            <>
-              <p style={{ margin: '0 0 15px 0', fontWeight: 'bold', color: '#2c3e50', fontSize: '0.95rem' }}>代表者のあなたが、1番目と3番目の目的地を入力してください。</p>
-              <div style={{ marginBottom: '15px' }}>
-                <label style={{ fontWeight: 'bold', color: '#e74c3c', fontSize: '0.9rem' }}>📍 1番目の目的地</label>
-                <DestinationInput value={dest1} onChange={setDest1} placeholder="例: 東口のカフェ" stationName={stationName} />
-              </div>
-              <div style={{ marginBottom: '20px' }}>
-                <label style={{ fontWeight: 'bold', color: '#2ecc71', fontSize: '0.9rem' }}>📍 3番目の目的地 (時間延長用/任意)</label>
-                <DestinationInput value={dest3} onChange={setDest3} placeholder="例: 公園など (任意)" stationName={stationName} />
-              </div>
-              <button className="btn-pop btn-purple" onClick={onSubmit} style={{ width: '100%' }}>
-                自分の目的地を送信する
-              </button>
-            </>
-          ) : (
-            // --- 相手の入力フォーム ---
-            <>
-              <p style={{ margin: '0 0 15px 0', fontWeight: 'bold', color: '#2c3e50', fontSize: '0.95rem' }}>あなたが、2番目の目的地を入力してください。</p>
-              <div style={{ marginBottom: '15px' }}>
-                <label style={{ fontWeight: 'bold', color: '#3498db', fontSize: '0.9rem' }}>📍 2番目の目的地</label>
-                <DestinationInput value={dest2} onChange={setDest2} placeholder="例: コンビニ" stationName={stationName} />
-              </div>
-              <button className="btn-pop btn-blue" onClick={onSubmit} style={{ width: '100%' }}>
-                自分の目的地を送信する
-              </button>
-            </>
-          )
-        ) : (
-          // --- 送信後の待機画面 ---
-          <div style={{ textAlign: 'center', padding: '10px 0' }}>
-            <div style={{ fontSize: '3.5rem', marginBottom: '10px' }}>✅</div>
-            <p style={{ fontWeight: '800', color: '#27ae60', fontSize: '1.2rem', margin: '0 0 10px 0' }}>あなたの入力完了！</p>
-            {!bothSubmitted && <p style={{ color: '#7f8c8d', fontSize: '1rem', fontWeight: 'bold', margin: 0 }}>相手の入力を待っています...</p>}
-          </div>
-        )}
-
-        {/* --- 双方が送信完了したら出発ボタンを出す --- */}
-        {bothSubmitted && isMyTurn && (
-          <div style={{ marginTop: '25px', borderTop: '3px dashed #d2b4de', paddingTop: '20px' }}>
-            <p style={{ fontWeight: '800', color: '#e74c3c', fontSize: '1.2rem', marginBottom: '15px', textAlign: 'center' }}>🎉 2人の目的地が揃いました！</p>
-            <button className="btn-pop" onClick={onStart}>確定して出発！(タイマースタート)</button>
-          </div>
-        )}
-        {/* 目的地の候補として、この駅で買える物件を表示 */}
-        {!mySubmitted && <StationShopList stationName={stationName} properties={properties} onPick={pickDestination} />}
-
-        {bothSubmitted && !isMyTurn && (
-          <div style={{ marginTop: '25px', borderTop: '3px dashed #d2b4de', paddingTop: '20px', textAlign: 'center' }}>
-            <p style={{ fontWeight: '800', color: '#3498db', fontSize: '1.1rem', marginBottom: '10px' }}>2人の目的地が揃いました！</p>
-            <p style={{ color: '#7f8c8d', fontSize: '0.9rem', fontWeight: 'bold', margin: 0 }}>代表者の出発を待っています...</p>
-          </div>
-        )}
-
-      </div>
-    </>
-  );
-};
-
 // --- ミッション詳細 UI ---
 export const MissionPhaseUI: React.FC<{
   roomId: string; timerData: any;
   currentStationName: string; stayTime: number; squareType: string;
-  destinations: { dest1: string; dest2: string; dest3: string } | null;
+  destinationNotes: string[];
+  onAddNote: (note: string) => void;
+  onRemoveNote: (note: string) => void;
   myMission: Mission | undefined; opponentMission: Mission | undefined; opponentName: string;
   isMyTurn: boolean; onEndMission: (mySuccess: boolean, opSuccess: boolean) => void;
-}> = ({ roomId, timerData, currentStationName, stayTime, squareType, destinations, myMission, opponentMission, opponentName, isMyTurn, onEndMission }) => {
+}> = ({ roomId, timerData, currentStationName, stayTime, squareType, destinationNotes, onAddNote, onRemoveNote, myMission, opponentMission, opponentName, isMyTurn, onEndMission }) => {
   const getMissionColor = (type?: string) => {
     if (type === 'blue') return { bg: '#e3f2fd', border: '#64b5f6', text: '#1976d2', label: '🔵 青マス' };
     if (type === 'red') return { bg: '#ffebee', border: '#e57373', text: '#d32f2f', label: '🔴 赤マス' };
@@ -503,16 +414,8 @@ export const MissionPhaseUI: React.FC<{
           <span style={{ fontWeight: '800', color: '#e74c3c', fontSize: '1.2rem', background: '#fff', padding: '6px 12px', borderRadius: '10px', border: '3px solid #ff7675' }}>⏱️ {stayTime}分</span>
         </div>
 
-        {destinations && (
-          <div style={{ background: '#fff', padding: '15px', borderRadius: '12px', border: '2px dashed #3498db', marginBottom: '20px', textAlign: 'left' }}>
-            <p style={{ margin: '0 0 10px 0', fontWeight: 'bold', color: '#2c3e50' }}>🚩 今ターンの目的地</p>
-            <div style={{ fontSize: '0.95rem', fontWeight: 'bold' }}>
-              <div style={{ color: '#e74c3c', marginBottom: '5px' }}>① <DestinationText value={destinations.dest1} /></div>
-              <div style={{ color: '#3498db', marginBottom: '5px' }}>② <DestinationText value={destinations.dest2} /></div>
-              {destinations.dest3 && <div style={{ color: '#2ecc71' }}>③ <DestinationText value={destinations.dest3} /></div>}
-            </div>
-          </div>
-        )}
+        {/* 今ターンの目的地メモ（2 人ともいつでも追加・削除できる） */}
+        <DestinationMemo notes={destinationNotes} stationName={currentStationName} onAdd={onAddNote} onRemove={onRemoveNote} />
 
         <div style={{ textAlign: 'center', marginBottom: '20px' }}>
           <span style={{ background: currentSquare.bg, border: `3px solid ${currentSquare.border}`, color: currentSquare.text, padding: '8px 16px', borderRadius: '20px', fontWeight: '800', fontSize: '1rem', boxShadow: '0 4px 0 rgba(0,0,0,0.05)' }}>
@@ -844,7 +747,7 @@ export const StationShopList: React.FC<{
                   onClick={() => onPick(p.name)}
                   style={{ border: 'none', borderRadius: '999px', padding: '6px 10px', background: '#a29bfe', color: '#fff', fontWeight: 800, fontSize: '0.75rem', whiteSpace: 'nowrap', cursor: 'pointer' }}
                 >
-                  目的地に入れる
+                  目的地メモに追加
                 </button>
               )}
             </div>
@@ -982,5 +885,41 @@ const DestinationText: React.FC<{ value?: string }> = ({ value }) => {
         </a>
       )}
     </>
+  );
+};
+
+/** 今ターンの目的地メモ。Googleマップの場所（地図リンク付き）や、行きたい所を書いておける */
+const DestinationMemo: React.FC<{
+  notes: string[];
+  stationName: string;
+  onAdd: (note: string) => void;
+  onRemove: (note: string) => void;
+}> = ({ notes, stationName, onAdd, onRemove }) => {
+  const [draft, setDraft] = useState('');
+  const add = () => {
+    if (!draft.trim()) return;
+    onAdd(draft);
+    setDraft('');
+  };
+  return (
+    <div style={{ background: '#fff', padding: '15px', borderRadius: '12px', border: '2px dashed #3498db', marginBottom: '20px', textAlign: 'left' }}>
+      <p style={{ margin: '0 0 10px 0', fontWeight: 'bold', color: '#2c3e50' }}>🚩 今ターンの目的地メモ</p>
+      {notes.length === 0 ? (
+        <p style={{ margin: '0 0 10px 0', fontSize: '0.85rem', color: '#95a5a6', fontWeight: 700 }}>まだありません。行きたい所を追加しよう！</p>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '12px' }}>
+          {notes.map((n) => (
+            <div key={n} style={{ display: 'flex', alignItems: 'center', gap: '8px', background: '#f5f9ff', borderRadius: '8px', padding: '8px 10px', fontWeight: 'bold', fontSize: '0.95rem', color: '#2c3e50' }}>
+              <span style={{ flex: 1 }}>📍 <DestinationText value={n} /></span>
+              <button onClick={() => onRemove(n)} aria-label="削除" style={{ border: 'none', background: 'none', color: '#b2bec3', fontSize: '1.1rem', cursor: 'pointer' }}>✕</button>
+            </div>
+          ))}
+        </div>
+      )}
+      <DestinationInput value={draft} onChange={setDraft} placeholder="例: 東口のカフェ（共有した場所も貼り付けOK）" stationName={stationName} />
+      <button className="btn-pop btn-blue" onClick={add} disabled={!draft.trim()} style={{ marginTop: '10px' }}>
+        ＋ メモに追加
+      </button>
+    </div>
   );
 };
