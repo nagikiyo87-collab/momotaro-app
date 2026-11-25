@@ -11,13 +11,15 @@ export const GameHeader: React.FC<{
   currentYear: number; 
   seasonLabel: string; 
   roomId: string; 
-  copySuccess: boolean; 
-  onCopyRoomId: () => void; 
+  inviteUrl: string;
   onOpenRule: () => void; 
   currentStationName: string; 
   remainingStations: number;  
-}> = ({ currentYear, seasonLabel, roomId, copySuccess, onCopyRoomId, onOpenRule, currentStationName, remainingStations }) => {
+}> = ({ currentYear, seasonLabel, roomId, inviteUrl, onOpenRule, currentStationName, remainingStations }) => {
+  // 招待用の QR コード（相手のスマホで読み取ると、この部屋に参加できる）
+  const [showQr, setShowQr] = useState(false);
   return (
+    <>
     <header style={{ position: 'sticky', top: '10px', zIndex: 100, display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', background: 'rgba(255, 255, 255, 0.95)', padding: '15px', borderRadius: '16px', boxShadow: '0 4px 12px rgba(0,0,0,0.08)', backdropFilter: 'blur(5px)' }}>
       <div>
         <div style={{ fontWeight: '900', color: '#2c3e50', fontSize: '1.3rem', marginBottom: '6px' }}>
@@ -32,14 +34,27 @@ export const GameHeader: React.FC<{
         <div style={{ fontSize: '0.8rem', color: '#7f8c8d', fontWeight: 'bold', letterSpacing: '1px' }}>
           ルームID: {roomId}
         </div>
-        <button onClick={onCopyRoomId} style={{ background: '#3498db', color: '#fff', border: 'none', padding: '6px 12px', borderRadius: '20px', fontSize: '0.8rem', fontWeight: 'bold', cursor: 'pointer', boxShadow: '0 2px 0 #2980b9', width: '100%' }}>
-          {copySuccess ? '✓ コピー完了' : '📋 ルームIDコピー'}
+        <button onClick={() => setShowQr(true)} style={{ background: '#3498db', color: '#fff', border: 'none', padding: '6px 12px', borderRadius: '20px', fontSize: '0.8rem', fontWeight: 'bold', cursor: 'pointer', boxShadow: '0 2px 0 #2980b9', width: '100%' }}>
+          📱 招待QRコード
         </button>
         <button onClick={onOpenRule} style={{ width: '100%', background: '#f1c40f', color: '#d35400', border: 'none', padding: '6px 10px', borderRadius: '20px', fontSize: '0.8rem', fontWeight: 'bold', cursor: 'pointer', boxShadow: '0 2px 0 #f39c12' }}>
           ⚙️ メニュー
         </button>
       </div>
     </header>
+    {showQr && (
+      <div onClick={() => setShowQr(false)} style={{ position: 'fixed', inset: 0, zIndex: 500, background: 'rgba(0,0,0,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+        <div onClick={(e) => e.stopPropagation()} style={{ background: '#fff', borderRadius: 20, padding: '24px 20px', textAlign: 'center', maxWidth: 320, width: '100%' }}>
+          <p style={{ margin: '0 0 12px 0', fontWeight: 900, fontSize: '1.1rem', color: '#2c3e50' }}>📱 相手のスマホで読み取ってね</p>
+          <div style={{ display: 'inline-block', padding: 12, background: '#fff', borderRadius: 12, border: '3px solid #dfe6e9' }}>
+            <QRCodeSVG value={inviteUrl} size={200} />
+          </div>
+          <p style={{ margin: '12px 0 16px 0', fontSize: '0.85rem', color: '#7f8c8d', fontWeight: 700 }}>ルームID: {roomId}</p>
+          <button className="btn-pop" onClick={() => setShowQr(false)}>閉じる</button>
+        </div>
+      </div>
+    )}
+    </>
   );
 };
 
@@ -844,24 +859,34 @@ export const StationShopList: React.FC<{
 // 🗺️ 目的地の入力（Googleマップから共有して貼り付け）
 // ==========================================
 /**
- * Googleマップの「共有」でコピーした文字（例：「店名\nhttps://maps.app.goo.gl/xxx」）を
- * 「店名 https://...」の 1 行にする。URL がなければそのまま
+ * Googleマップの「共有」でコピーした文字を「店名 https://...」の 1 行にする。
+ * iPhone の「リンクをコピー」は URL だけなので、そのときはサーバー（/api/place-name）で店名を調べる
  */
-const normalizeSharedPlace = (text: string) => {
-  const url = text.match(/https?:\/\/\S+/)?.[0];
-  if (!url) return text.trim();
+const parseShared = (text: string) => {
+  const url = text.match(/https?:\/\/\S+/)?.[0] ?? null;
   const name = text
     .split(/\n/)
     .map((l) => l.trim())
-    .find((l) => l && !l.includes('http'));
-  return `${name || '地図の場所'} ${url}`;
+    .find((l) => l && !l.includes('http')) ?? '';
+  return { url, name };
+};
+
+const lookUpPlaceName = async (url: string): Promise<string | null> => {
+  try {
+    const r = await fetch(`/api/place-name?url=${encodeURIComponent(url)}`);
+    if (!r.ok) return null;
+    const j = await r.json();
+    return typeof j.name === 'string' && j.name ? j.name : null;
+  } catch {
+    return null;
+  }
 };
 
 /** 「店名 https://...」を店名と URL に分ける */
 const splitDestination = (value: string) => {
   const url = value.match(/https?:\/\/\S+/)?.[0] ?? null;
   const name = url ? value.replace(url, '').trim() : value;
-  return { name: name || '地図の場所', url };
+  return { name: name || 'Googleマップの場所', url };
 };
 
 /** 目的地の入力欄。「Googleマップで探す」で駅の周辺を開き、共有でコピーした場所を「貼り付け」で入れる */
@@ -871,11 +896,37 @@ const DestinationInput: React.FC<{ value: string; onChange: (v: string) => void;
   placeholder,
   stationName,
 }) => {
-  const searchUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${stationName}駅 ${splitDestination(value).name || ''}`.trim())}`;
+  const [status, setStatus] = useState<'idle' | 'looking' | 'need-name'>('idle');
+  const typed = value.replace(/https?:\/\/\S+/, '').trim();
+  const searchUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${stationName}駅 ${typed}`.trim())}`;
+
+  const applyShared = async (text: string) => {
+    const { url, name } = parseShared(text);
+    if (!url) {
+      onChange(text.trim());
+      return;
+    }
+    if (name) {
+      onChange(`${name} ${url}`);
+      setStatus('idle');
+      return;
+    }
+    // URL だけのときは店名を調べる
+    onChange(url);
+    setStatus('looking');
+    const found = await lookUpPlaceName(url);
+    if (found) {
+      onChange(`${found} ${url}`);
+      setStatus('idle');
+    } else {
+      setStatus('need-name');
+    }
+  };
+
   const paste = async () => {
     try {
       const text = await navigator.clipboard.readText();
-      if (text) onChange(normalizeSharedPlace(text));
+      if (text) await applyShared(text);
     } catch {
       alert('貼り付けできませんでした。入力欄を長押しして「ペースト」してください。');
     }
@@ -886,17 +937,26 @@ const DestinationInput: React.FC<{ value: string; onChange: (v: string) => void;
       <input
         type="text"
         value={value}
-        onChange={(e) => onChange(e.target.value)}
+        onChange={(e) => {
+          onChange(e.target.value);
+          if (status === 'need-name') setStatus('idle');
+        }}
         onPaste={(e) => {
           const text = e.clipboardData.getData('text');
           if (/https?:\/\//.test(text)) {
             e.preventDefault();
-            onChange(normalizeSharedPlace(text));
+            void applyShared(text);
           }
         }}
         placeholder={placeholder}
         style={{ width: '100%', padding: '12px', borderRadius: '8px', border: '2px solid #bdc3c7', marginTop: '5px', boxSizing: 'border-box' }}
       />
+      {status === 'looking' && <p style={{ margin: '4px 0 0', fontSize: '0.8rem', color: '#1a73e8', fontWeight: 700 }}>🔎 お店の名前を調べています…</p>}
+      {status === 'need-name' && (
+        <p style={{ margin: '4px 0 0', fontSize: '0.8rem', color: '#e17055', fontWeight: 700 }}>
+          お店の名前が分かりませんでした。リンクの前にお店の名前を入力してください。
+        </p>
+      )}
       <div style={{ display: 'flex', gap: '8px', marginTop: '6px' }}>
         <a href={searchUrl} target="_blank" rel="noopener noreferrer" style={{ ...btn, background: '#e8f0fe', color: '#1a73e8', textAlign: 'center', textDecoration: 'none' }}>
           🗺️ Googleマップで探す

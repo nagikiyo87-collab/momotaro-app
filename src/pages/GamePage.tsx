@@ -118,10 +118,10 @@ export const GamePage: React.FC<Props> = ({ roomId, userId }) => {
     return true;
   });
 
-  const opponentIsOffline = opponentId && opponent && opponent.isOnline === false;
   const waitingForOpponent = !opponentId; 
   
-  if (waitingForOpponent || opponentIsOffline) {
+  // 相手がアプリを閉じても画面は切り替えない（2026-11-25 ユーザー希望）。まだ相手が参加していないときだけ待機画面
+  if (waitingForOpponent) {
     return (
       <div style={{
         position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
@@ -218,8 +218,8 @@ export const GamePage: React.FC<Props> = ({ roomId, userId }) => {
         currentYear={roomData?.year || 1} 
         seasonLabel={getSeasonLabel(roomData?.season || 'spring')} 
         roomId={roomId} 
-        copySuccess={copySuccess} 
-        onCopyRoomId={handleCopyRoomId} 
+ 
+        inviteUrl={inviteUrl}
         onOpenRule={() => setIsRuleOpen(true)} 
         currentStationName={currentStationName} 
         remainingStations={STATIONS.length - 1 - sharedPosition} 
