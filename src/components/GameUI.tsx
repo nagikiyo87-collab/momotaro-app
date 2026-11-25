@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { QRCodeSVG } from 'qrcode.react';
-import { STATIONS, ITEMS, START_MONEY, SQUARE_STYLE, type SquareType, type Mission, type Property } from '../data/gameData';
+import { STATIONS, ITEMS, START_MONEY, RANK_THRESHOLDS, SQUARE_STYLE, type SquareType, type Mission, type Property } from '../data/gameData';
 import { useModal } from '../contexts/ModalContext';
 import { doc, updateDoc } from 'firebase/firestore';
 import { db } from '../firebase';
@@ -382,11 +382,11 @@ export const DestinationPhaseUI: React.FC<{
               <p style={{ margin: '0 0 15px 0', fontWeight: 'bold', color: '#2c3e50', fontSize: '0.95rem' }}>代表者のあなたが、1番目と3番目の目的地を入力してください。</p>
               <div style={{ marginBottom: '15px' }}>
                 <label style={{ fontWeight: 'bold', color: '#e74c3c', fontSize: '0.9rem' }}>📍 1番目の目的地</label>
-                <input type="text" value={dest1} onChange={e => setDest1(e.target.value)} placeholder="例: 東口のカフェ" style={{ width: '100%', padding: '12px', borderRadius: '8px', border: '2px solid #bdc3c7', marginTop: '5px' }} />
+                <DestinationInput value={dest1} onChange={setDest1} placeholder="例: 東口のカフェ" stationName={stationName} />
               </div>
               <div style={{ marginBottom: '20px' }}>
                 <label style={{ fontWeight: 'bold', color: '#2ecc71', fontSize: '0.9rem' }}>📍 3番目の目的地 (時間延長用/任意)</label>
-                <input type="text" value={dest3} onChange={e => setDest3(e.target.value)} placeholder="例: 公園など (任意)" style={{ width: '100%', padding: '12px', borderRadius: '8px', border: '2px solid #bdc3c7', marginTop: '5px' }} />
+                <DestinationInput value={dest3} onChange={setDest3} placeholder="例: 公園など (任意)" stationName={stationName} />
               </div>
               <button className="btn-pop btn-purple" onClick={onSubmit} style={{ width: '100%' }}>
                 自分の目的地を送信する
@@ -398,7 +398,7 @@ export const DestinationPhaseUI: React.FC<{
               <p style={{ margin: '0 0 15px 0', fontWeight: 'bold', color: '#2c3e50', fontSize: '0.95rem' }}>あなたが、2番目の目的地を入力してください。</p>
               <div style={{ marginBottom: '15px' }}>
                 <label style={{ fontWeight: 'bold', color: '#3498db', fontSize: '0.9rem' }}>📍 2番目の目的地</label>
-                <input type="text" value={dest2} onChange={e => setDest2(e.target.value)} placeholder="例: コンビニ" style={{ width: '100%', padding: '12px', borderRadius: '8px', border: '2px solid #bdc3c7', marginTop: '5px' }} />
+                <DestinationInput value={dest2} onChange={setDest2} placeholder="例: コンビニ" stationName={stationName} />
               </div>
               <button className="btn-pop btn-blue" onClick={onSubmit} style={{ width: '100%' }}>
                 自分の目的地を送信する
@@ -492,9 +492,9 @@ export const MissionPhaseUI: React.FC<{
           <div style={{ background: '#fff', padding: '15px', borderRadius: '12px', border: '2px dashed #3498db', marginBottom: '20px', textAlign: 'left' }}>
             <p style={{ margin: '0 0 10px 0', fontWeight: 'bold', color: '#2c3e50' }}>🚩 今ターンの目的地</p>
             <div style={{ fontSize: '0.95rem', fontWeight: 'bold' }}>
-              <div style={{ color: '#e74c3c', marginBottom: '5px' }}>① {destinations.dest1}</div>
-              <div style={{ color: '#3498db', marginBottom: '5px' }}>② {destinations.dest2}</div>
-              {destinations.dest3 && <div style={{ color: '#2ecc71' }}>③ {destinations.dest3}</div>}
+              <div style={{ color: '#e74c3c', marginBottom: '5px' }}>① <DestinationText value={destinations.dest1} /></div>
+              <div style={{ color: '#3498db', marginBottom: '5px' }}>② <DestinationText value={destinations.dest2} /></div>
+              {destinations.dest3 && <div style={{ color: '#2ecc71' }}>③ <DestinationText value={destinations.dest3} /></div>}
             </div>
           </div>
         )}
@@ -671,7 +671,7 @@ export const BiddingPhaseUI: React.FC<{
                 </div>
               )}
               {selectedPropertyId && (
-                <button className="btn-pop btn-purple" onClick={() => onSubmitBid(selectedPropertyId === 'skip' ? '' : selectedPropertyId)}>
+                <button className="btn-pop btn-purple" disabled={currentlySelectedProperty?.type === 'limit' && !(bidAmount > 0)} onClick={() => onSubmitBid(selectedPropertyId === 'skip' ? '' : selectedPropertyId)}>
                   🔒 入札を確定する
                 </button>
               )}
@@ -709,9 +709,9 @@ export const ResultPhaseUI: React.FC<{ me: any; opponent: any }> = ({ me, oppone
   };
 
   const getRankAndReward = (diff: number) => {
-    if (diff >= 30000) return { rank: '🏆 Sランク', reward: '上限10,000円までの豪華な食事を奢る（焼肉、回らない寿司など）' };
-    if (diff >= 10000) return { rank: '🥇 Aランク', reward: 'ちょっといいランチ・ディナー奢り（3,000〜5,000円程度）' };
-    if (diff >= 3000)  return { rank: '🥈 Bランク', reward: 'カフェでケーキセット、または軽食奢り（1,000〜2,000円程度）' };
+    if (diff >= RANK_THRESHOLDS.S) return { rank: '🏆 Sランク', reward: '上限10,000円までの豪華な食事を奢る（焼肉、回らない寿司など）' };
+    if (diff >= RANK_THRESHOLDS.A) return { rank: '🥇 Aランク', reward: 'ちょっといいランチ・ディナー奢り（3,000〜5,000円程度）' };
+    if (diff >= RANK_THRESHOLDS.B)  return { rank: '🥈 Bランク', reward: 'カフェでケーキセット、または軽食奢り（1,000〜2,000円程度）' };
     return { rank: '🥉 Cランク', reward: 'コンビニで好きなアイス＆ジュース奢り（数百円）' };
   };
 
@@ -837,5 +837,90 @@ export const StationShopList: React.FC<{
         })}
       </div>
     </div>
+  );
+};
+
+// ==========================================
+// 🗺️ 目的地の入力（Googleマップから共有して貼り付け）
+// ==========================================
+/**
+ * Googleマップの「共有」でコピーした文字（例：「店名\nhttps://maps.app.goo.gl/xxx」）を
+ * 「店名 https://...」の 1 行にする。URL がなければそのまま
+ */
+const normalizeSharedPlace = (text: string) => {
+  const url = text.match(/https?:\/\/\S+/)?.[0];
+  if (!url) return text.trim();
+  const name = text
+    .split(/\n/)
+    .map((l) => l.trim())
+    .find((l) => l && !l.includes('http'));
+  return `${name || '地図の場所'} ${url}`;
+};
+
+/** 「店名 https://...」を店名と URL に分ける */
+const splitDestination = (value: string) => {
+  const url = value.match(/https?:\/\/\S+/)?.[0] ?? null;
+  const name = url ? value.replace(url, '').trim() : value;
+  return { name: name || '地図の場所', url };
+};
+
+/** 目的地の入力欄。「Googleマップで探す」で駅の周辺を開き、共有でコピーした場所を「貼り付け」で入れる */
+const DestinationInput: React.FC<{ value: string; onChange: (v: string) => void; placeholder: string; stationName: string }> = ({
+  value,
+  onChange,
+  placeholder,
+  stationName,
+}) => {
+  const searchUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${stationName}駅 ${splitDestination(value).name || ''}`.trim())}`;
+  const paste = async () => {
+    try {
+      const text = await navigator.clipboard.readText();
+      if (text) onChange(normalizeSharedPlace(text));
+    } catch {
+      alert('貼り付けできませんでした。入力欄を長押しして「ペースト」してください。');
+    }
+  };
+  const btn: React.CSSProperties = { flex: 1, border: 'none', borderRadius: '999px', padding: '8px 6px', fontWeight: 800, fontSize: '0.8rem', cursor: 'pointer' };
+  return (
+    <>
+      <input
+        type="text"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        onPaste={(e) => {
+          const text = e.clipboardData.getData('text');
+          if (/https?:\/\//.test(text)) {
+            e.preventDefault();
+            onChange(normalizeSharedPlace(text));
+          }
+        }}
+        placeholder={placeholder}
+        style={{ width: '100%', padding: '12px', borderRadius: '8px', border: '2px solid #bdc3c7', marginTop: '5px', boxSizing: 'border-box' }}
+      />
+      <div style={{ display: 'flex', gap: '8px', marginTop: '6px' }}>
+        <a href={searchUrl} target="_blank" rel="noopener noreferrer" style={{ ...btn, background: '#e8f0fe', color: '#1a73e8', textAlign: 'center', textDecoration: 'none' }}>
+          🗺️ Googleマップで探す
+        </a>
+        <button type="button" onClick={paste} style={{ ...btn, background: '#f1f2f6', color: '#2f3542' }}>
+          📋 共有した場所を貼り付け
+        </button>
+      </div>
+    </>
+  );
+};
+
+/** 目的地の表示。Googleマップの URL があれば「地図」リンクを付ける（ミッション中の道案内用） */
+const DestinationText: React.FC<{ value?: string }> = ({ value }) => {
+  if (!value) return null;
+  const { name, url } = splitDestination(value);
+  return (
+    <>
+      {name}
+      {url && (
+        <a href={url} target="_blank" rel="noopener noreferrer" style={{ marginLeft: 8, fontSize: '0.8rem', color: '#1a73e8', fontWeight: 800 }}>
+          🗺️ 地図
+        </a>
+      )}
+    </>
   );
 };

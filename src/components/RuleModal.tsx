@@ -134,7 +134,7 @@ export const RuleModal: React.FC<Props> = ({ isOpen, onClose, onAdjustMoney }) =
                     ② 着いた駅のマスの色でミッションが決まり、滞在時間（30・45・60分）もランダムで決まる。<br/>
                     ③ お互いの行きたい目的地を決め、確定したら出発。<br/>
                     ④ 制限時間内にミッションを実行する。<br/>
-                    ⑤ 滞在中、現実で使ったお金を入力して所持金から引く。<br/>
+                    ⑤ 滞在中の飲食や買い物は自由に楽しんでOK（ゲームの所持金からは引かれません）。<br/>
                     ⑥ その駅の「物件」をシークレット入札で購入する。<br/>
                     ⑦ 夏と冬の終わりに決算（物件の収益受け取り）が発生します（年2回）。<br/><br/>
                     **【最初の所持金】** 10,000円
@@ -196,7 +196,7 @@ export const RuleModal: React.FC<Props> = ({ isOpen, onClose, onAdjustMoney }) =
                 <div>
                   <h3 style={{ color: '#2c3e50', borderBottom: '2px solid #ecf0f1', paddingBottom: '8px', marginBottom: '15px' }}>🏢 物件と借金</h3>
                   <p style={{ fontSize: '0.9rem', lineHeight: '1.6', color: '#34495e' }}>
-                    ・ゲーム内の所持金のみで現実の買い物をします。<br/>
+                    ・物件のお店で実際に使った金額が、そのまま入札額になります（0円では買えません）。<br/>
                     ・上限額を超えて買っても、ゲーム内では上限額として計算されます。<br/>
                     <span style={{ fontWeight: 'bold', color: '#8e44ad' }}>・公園などの「固定値」スポットは、入札額の入力は不要で、固定の金額が引かれます。</span><br/>
                     ・相手と同じ物件を選んだ場合は、**「実際の購入額が高い方」**が獲得します。（同額ならサイコロ勝負）<br/>

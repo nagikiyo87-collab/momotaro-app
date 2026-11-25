@@ -316,7 +316,7 @@ export const useTurnActions = (
       nextBombyType = 'normal';
     }
 
-    alertMsg += `\n続けて「リアル出費の入力」に移動します！`;
+    alertMsg += `\n続けて「物件の入札」に移動します！`;
     
     // UIアラート待機はそのまま
     await showAlert(alertMsg);
@@ -325,7 +325,9 @@ export const useTurnActions = (
     updateDoc(doc(db, 'rooms', roomId), {
       [`players.${userId}.money`]: myResult.newMoney, [`players.${userId}.properties`]: myResult.remainingProperties, [`players.${userId}.items`]: myNewItems,
       [`players.${opponentId}.money`]: opResult.newMoney, [`players.${opponentId}.properties`]: opResult.remainingProperties, [`players.${opponentId}.items`]: opponentNewItems,
-      bombyPossessedId: newBombyId, bombyType: nextBombyType, phase: 'spending', spendings: {},
+      bombyPossessedId: newBombyId, bombyType: nextBombyType,
+      // リアル出費は差し引かない（2026-11-25 ユーザー決定）。ミッションの後はすぐ物件の入札へ
+      phase: 'bidding', bids: {},
       // ミッション系のカード（報酬2倍・フリーパス）は 2 人ともここで使い切り
       ...(activeItemEffect && MISSION_EFFECTS.includes(activeItemEffect) ? { [`activeEffects.${userId}`]: deleteField() } : {}),
       ...(opponentEffect && MISSION_EFFECTS.includes(opponentEffect) ? { [`activeEffects.${opponentId}`]: deleteField() } : {}),
@@ -368,6 +370,11 @@ export const useTurnActions = (
     if (finalPropertyId && finalPropertyId !== 'skip') {
       const selectedProp = currentProperties.find(p => p.id === finalPropertyId);
       if (selectedProp) {
+        // 0 円では買えない（実際に使った金額の入力が必要）
+        if (selectedProp.type === 'limit' && bidAmount <= 0) {
+          await showAlert('⚠️ 実際に使った金額を入力してください！\n0円では物件を買えません。');
+          return;
+        }
         if (selectedProp.type === 'limit' && bidAmount > selectedProp.price) {
           await showAlert(`⚠️ リアル入札額（${bidAmount}円）が物件の上限を超えています！\nルールに基づき、ゲーム内の入札額は「${selectedProp.price}円」として確定します。`);
           finalAmount = selectedProp.price;
@@ -386,8 +393,16 @@ export const useTurnActions = (
     updateDoc(doc(db, 'rooms', roomId), { [`bids.${userId}`]: { propertyId: finalPropertyId, amount: finalAmount } }).catch(console.error);
   };
 
-  const handleRevealBids = async (myBid: any, opponentBid: any) => {
+  const handleRevealBids = async (rawMyBid: any, rawOpponentBid: any) => {
     if (!opponentId) return;
+    // 上限ありの物件を 0 円以下で入札していたら「買わない」扱い（0 円で買えてしまう不具合の対策）
+    const sanitize = (bid: any) => {
+      const prop = currentProperties.find(p => p.id === bid?.propertyId);
+      if (prop && prop.type === 'limit' && !(bid.amount > 0)) return { propertyId: '', amount: 0 };
+      return bid;
+    };
+    const myBid = sanitize(rawMyBid);
+    const opponentBid = sanitize(rawOpponentBid);
     let myWonProperty: Property | null = null; let opponentWonProperty: Property | null = null;
 
     if (myBid.propertyId !== opponentBid.propertyId) {

@@ -373,3 +373,9 @@ export const SQUARE_STYLE: Record<SquareType, { label: string; color: string; bg
 
 /** 滞在時間の候補（ランダムで 1 つ。出方は以前のルーレットと同じ） */
 export const STAY_TIMES = [30, 45, 60];
+
+/**
+ * ご褒美ランクの基準（総資産の差額）。2026-11-25 に引き下げ（以前は 30,000／10,000／3,000）。
+ * 新しいルールのシミュレーションで S 約 5%・A 約 20%・B 約 40%・C 約 35% になる
+ */
+export const RANK_THRESHOLDS = { S: 15000, A: 7000, B: 2500 };
