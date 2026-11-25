@@ -11,7 +11,7 @@
  * 現実の行動は計算できないので、下の SCENARIOS の数字で仮定する（2026-11-24 ユーザー了承）
  */
 import { writeFileSync, mkdirSync } from 'node:fs';
-import { STATIONS, STATION_PROPERTIES, MISSIONS, ITEMS, SHIELD_ID, pickItemIndexByRarity, type Property, type Mission } from '../../src/data/gameData.ts';
+import { STATIONS, STATION_PROPERTIES, MISSIONS, ITEMS, SHIELD_ID, RANK_THRESHOLDS, pickItemIndexByRarity, type Property, type Mission } from '../../src/data/gameData.ts';
 
 // ---------------------------------------------------------------- 仮定
 type Scenario = {
@@ -36,6 +36,7 @@ type Scenario = {
   spendMode?: 'deduct' | 'none' | 'allowance' | 'memory';
   allowance?: number;
   firstDestMiss?: number; // 1 番目の目的地に遅れる確率（ペナルティ廃止後は 0）
+  overheadMin?: number; // 1 ターンの操作の時間（分）。ルーレット・目的地フェーズ廃止後は短い
   // 貧乏神の逆転要素：憑かれている人が総資産で gap 円以上負けているとき、prob の確率で
   // jump＝相手に乗り移る（悪行なし）／ gift＝改心してお金をくれる（悪行の代わりに +gift 円）
   bombyComeback?: { gap: number; prob: number; kind: 'jump' | 'gift'; gift?: number };
@@ -130,6 +131,33 @@ const SCENARIOS: Scenario[] = [
       { ...V3, id: 'v3_allowance', label: '【案B】おこづかい制：1駅1,000円まで引かない（平均1,000円使う）', spendMode: 'allowance' as const, allowance: 1000, spendMean: 1000 },
       { ...V3, id: 'v3_memory', label: '【案C】思い出資産：引くが同額を資産に（平均1,000円使う）', spendMode: 'memory' as const, spendMean: 1000 },
       { ...V3, id: 'v3_none_3000', label: '【案A2】出費は引かない＋最初の所持金3,000円', spendMode: 'none' as const, spendMean: 1000, startMoney: 3000 },
+    ];
+  })(),
+  // ---- v4：2026-11-26 時点の本番のルール
+  ...(() => {
+    const V4: Scenario = {
+      ...BASE,
+      id: 'v4',
+      label: '【v4 本番】所持金1万・決算年2回・利息は冬だけ10%・後半は1個か2個（半々）・改心ボンビー・出費は引かない・到達ペナルティなし',
+      startMoney: 10000,
+      interestRate: 0.1,
+      interestOnlyWinter: true,
+      settleSeasons: [1, 3],
+      chooseTwoInSecondHalf: 0.5,
+      bombyComeback: { gap: 3000, prob: 0.25, kind: 'gift', gift: 3000 },
+      firstDestMiss: 0,
+      spendMode: 'none' as const,
+      overheadMin: 5,
+    };
+    return [
+      V4,
+      { ...V4, id: 'v4_mission_easy', label: '【v4】ミッション成功率 高め（95/80/60%）', successRate: [0.95, 0.8, 0.6] as [number, number, number] },
+      { ...V4, id: 'v4_mission_hard', label: '【v4】ミッション成功率 低め（60/40/20%）', successRate: [0.6, 0.4, 0.2] as [number, number, number] },
+      { ...V4, id: 'v4_bid_aggressive', label: '【v4】入札 強気（上限の90〜100%・必ず入札）', bidMin: 0.9, bidMax: 1.0, skipBid: 0 },
+      { ...V4, id: 'v4_bid_cautious', label: '【v4】入札 弱気（上限の40〜70%・30%は見送り）', bidMin: 0.4, bidMax: 0.7, skipBid: 0.3 },
+      { ...V4, id: 'v4_always_two', label: '【v4】後半はいつも2個を選ぶ', chooseTwoInSecondHalf: 1 },
+      { ...V4, id: 'v4_always_one', label: '【v4】後半もいつも1個を選ぶ', chooseTwoInSecondHalf: 0 },
+      { ...V4, id: 'v4_no_items', label: '【v4】アイテムを使わない', useItems: false },
     ];
   })(),
   {
@@ -232,7 +260,8 @@ const applyMoney = (p: Player, change: number, bucket: keyof Player) => {
 const assets = (p: Player) => p.money + p.memories + p.props.reduce((s, x) => s + x.price, 0);
 const income = (p: Player) => p.props.reduce((s, x) => s + Math.floor(x.price * (x.rate / 100)), 0);
 
-const rank = (diff: number) => (diff >= 30000 ? 'S' : diff >= 10000 ? 'A' : diff >= 3000 ? 'B' : 'C');
+// ご褒美ランク：アプリと同じ基準（gameData.ts の RANK_THRESHOLDS）
+const rank = (diff: number) => (diff >= RANK_THRESHOLDS.S ? 'S' : diff >= RANK_THRESHOLDS.A ? 'A' : diff >= RANK_THRESHOLDS.B ? 'B' : 'C');
 
 const takeItem = (p: Player, id: string) => {
   const i = p.items.indexOf(id);
@@ -371,8 +400,8 @@ const playGame = (sc: Scenario): GameResult => {
 
     // ---- ルーレット（滞在時間とマス）
     const stay = pick([30, 45, 60]);
-    minutes += stay + OVERHEAD_MIN_PER_TURN;
-    minutesAlt += stay + OVERHEAD_MIN_PER_TURN;
+    minutes += stay + (sc.overheadMin ?? OVERHEAD_MIN_PER_TURN);
+    minutesAlt += stay + (sc.overheadMin ?? OVERHEAD_MIN_PER_TURN);
     const square = pick(['blue', 'red', 'green', 'yellow'] as const);
     const pool = square === 'yellow' ? MISSIONS : MISSIONS.filter((m) => m.type === square);
     const m0 = pick(pool);
