@@ -31,16 +31,6 @@ export const executeMoneySplit: ItemFunction = async ({ userId, opponentId, me, 
   };
 };
 
-// ③ 所持金リセット
-export const executeMoneyReset: ItemFunction = async ({ opponentId }) => {
-  return {
-    updates: {
-      [`players.${opponentId}.money`]: 0,
-    },
-    message: '💸 所持金リセット発動！\n相手の所持金を強制的に0円にしました！'
-  };
-};
-
 // ④ ミッション入れ替え
 export const executeMissionSwap: ItemFunction = async ({ userId, opponentId, roomData }) => {
   const myMission = roomData.currentMissions?.[userId];

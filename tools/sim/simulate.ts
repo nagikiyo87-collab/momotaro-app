@@ -38,6 +38,9 @@ type Scenario = {
   firstDestMiss?: number; // 1 番目の目的地に遅れる確率（ペナルティ廃止後は 0）
   overheadMin?: number; // 1 ターンの操作の時間（分）。ルーレット・目的地フェーズ廃止後は短い
   stayTimes?: { min: number; w: number }[]; // 滞在時間と出やすさ（既定は 30/45/60 分が同じ確率）
+  missionScale?: number; // ミッションの報酬・ペナルティ（金額のもの）の倍率
+  spendSpread?: boolean; // 2 人の使う金額に差をつける（1 駅平均 300〜1,500 円をそれぞれ決める）
+  spendAsset?: { ratio: number; cap?: number }; // 使った金額の ratio 倍を資産に足す（1 駅 cap 円まで）
   // 貧乏神の逆転要素：憑かれている人が総資産で gap 円以上負けているとき、prob の確率で
   // jump＝相手に乗り移る（悪行なし）／ gift＝改心してお金をくれる（悪行の代わりに +gift 円）
   bombyComeback?: { gap: number; prob: number; kind: 'jump' | 'gift'; gift?: number };
@@ -157,6 +160,19 @@ const SCENARIOS: Scenario[] = [
       { ...V4, id: 'v5_stay_even', label: '【案】所持金5,000円＋滞在 30/40/50/60 分が同じ確率', startMoney: 5000, stayTimes: [{ min: 30, w: 25 }, { min: 40, w: 25 }, { min: 50, w: 25 }, { min: 60, w: 25 }] },
       { ...V4, id: 'v5_stay_3535', label: '【案】所持金5,000円＋滞在 30・40 分 各35%、50・60 分 各15%', startMoney: 5000, stayTimes: [{ min: 30, w: 35 }, { min: 40, w: 35 }, { min: 50, w: 15 }, { min: 60, w: 15 }] },
       { ...V4, id: 'v5_stay_4030', label: '【案】所持金5,000円＋滞在 30分40%・40分30%・50分20%・60分10%', startMoney: 5000, stayTimes: [{ min: 30, w: 40 }, { min: 40, w: 30 }, { min: 50, w: 20 }, { min: 60, w: 10 }] },
+      // ---- 2026-11-26：v6＝所持金 5,000＋滞在 30・40 分多め（feature/money5000-stay）を基準にした案
+      ...(() => {
+        const V6: Scenario = { ...V4, id: 'v6', label: '【v6】所持金5,000＋滞在30・40分多め（2人の出費に差をつける）', startMoney: 5000, stayTimes: [{ min: 30, w: 35 }, { min: 40, w: 35 }, { min: 50, w: 15 }, { min: 60, w: 15 }], spendSpread: true };
+        return [
+          V6,
+          { ...V6, id: 'v6_m2', label: '【案】ミッションの金額 2 倍（※2026-11-26 にアプリ側を 3 倍にしたので、今は元の 6 倍）', missionScale: 2 },
+          { ...V6, id: 'v6_m3', label: '【案】ミッションの金額 3 倍（※アプリ側が 3 倍になったので、今は元の 9 倍）', missionScale: 3 },
+          { ...V6, id: 'v6_spend_full', label: '【案】使った金額を全額資産に（上限なし）', spendAsset: { ratio: 1 } },
+          { ...V6, id: 'v6_spend_cap1000', label: '【案】使った金額を資産に（1駅1,000円まで）', spendAsset: { ratio: 1, cap: 1000 } },
+          { ...V6, id: 'v6_spend_half500', label: '【案】使った金額の半分を資産に（1駅500円まで）', spendAsset: { ratio: 0.5, cap: 500 } },
+          { ...V6, id: 'v6_m3_cap500', label: '【案】ミッション3倍＋使った金額の半分を資産に（1駅500円まで）', missionScale: 3, spendAsset: { ratio: 0.5, cap: 500 } },
+        ];
+      })(),
       { ...V4, id: 'v4_mission_easy', label: '【v4】ミッション成功率 高め（95/80/60%）', successRate: [0.95, 0.8, 0.6] as [number, number, number] },
       { ...V4, id: 'v4_mission_hard', label: '【v4】ミッション成功率 低め（60/40/20%）', successRate: [0.6, 0.4, 0.2] as [number, number, number] },
       { ...V4, id: 'v4_bid_aggressive', label: '【v4】入札 強気（上限の90〜100%・必ず入札）', bidMin: 0.9, bidMax: 1.0, skipBid: 0 },
@@ -226,6 +242,9 @@ type Player = {
   itemsUsed: string[];
   wasInDebt: boolean;
   memories: number; // 思い出資産（spendMode = memory のとき）
+  missionWins: number; // ミッション成功の回数
+  totalSpent: number; // 現実で使った金額の合計
+  spendMean: number; // この人の 1 駅あたりの平均出費
 };
 
 const newPlayer = (startMoney = 3000): Player => ({
@@ -245,6 +264,9 @@ const newPlayer = (startMoney = 3000): Player => ({
   itemsUsed: [],
   wasInDebt: false,
   memories: 0,
+  missionWins: 0,
+  totalSpent: 0,
+  spendMean: 0,
 });
 
 // アプリと同じ：所持金がマイナスなら、安い物件から元値の 50% で売って補う
@@ -301,6 +323,7 @@ type GameResult = {
 
 const playGame = (sc: Scenario): GameResult => {
   const P = [newPlayer(sc.startMoney), newPlayer(sc.startMoney)];
+  for (const p of P) p.spendMean = sc.spendSpread ? 300 + rnd() * 1200 : sc.spendMean;
   let pos = 0;
   let turn = 0;
   let rep: 0 | 1 = 0; // 代表者（サイコロを振る人）。最初はホスト
@@ -453,29 +476,34 @@ const playGame = (sc: Scenario): GameResult => {
       if (!mySuccess && effects[rep] === 'pass') mySuccess = true;
       const r = P[rep];
       const o = P[other(rep)];
+      // ミッションの金額の倍率（案）。所持金半減のペナルティはそのまま
+      const k = sc.missionScale ?? 1;
+      const R = (n: number) => Math.round(n * k);
       let rc = 0;
       let oc = 0;
+      if (mySuccess) r.missionWins++;
+      if (opSuccess) o.missionWins++;
       if (mySuccess) {
-        let reward = myM.reward || 0;
+        let reward = R(myM.reward || 0);
         if (effects[rep] === 'double') reward *= 2;
         if (myM.type === 'blue') rc += reward;
         if (myM.type === 'green') {
           rc += reward;
-          oc += myM.reward;
+          oc += R(myM.reward);
         }
       } else if (myM.type === 'red') {
         if (myM.penaltyType === 'half_money') rc -= r.money > 0 ? Math.ceil(r.money / 2) : 0;
-        else rc -= myM.penalty;
+        else rc -= R(myM.penalty);
       }
       if (opSuccess) {
-        if (opM.type === 'blue') oc += opM.reward;
+        if (opM.type === 'blue') oc += R(opM.reward);
         if (opM.type === 'green' && myM.type !== 'green') {
-          rc += opM.reward;
-          oc += opM.reward;
+          rc += R(opM.reward);
+          oc += R(opM.reward);
         }
       } else if (opM.type === 'red') {
         if (opM.penaltyType === 'half_money') oc -= o.money > 0 ? Math.ceil(o.money / 2) : 0;
-        else oc -= opM.penalty;
+        else oc -= R(opM.penalty);
       }
       if (square === 'yellow') {
         if (mySuccess) gain(r);
@@ -492,7 +520,10 @@ const playGame = (sc: Scenario): GameResult => {
 
     // ---- リアル出費
     for (const p of P) {
-      const s = spend(sc.spendMean);
+      const s = spend(p.spendMean);
+      p.totalSpent += s;
+      // 案：使った金額を資産に足す（上限つき）
+      if (sc.spendAsset) p.memories += Math.min(Math.round(s * sc.spendAsset.ratio), sc.spendAsset.cap ?? Infinity);
       const mode = sc.spendMode ?? 'deduct';
       if (mode === 'deduct') applyMoney(p, -s, 'fromSpend');
       else if (mode === 'allowance') applyMoney(p, -Math.max(0, s - (sc.allowance ?? 1000)), 'fromSpend');
@@ -719,6 +750,16 @@ for (const sc of SCENARIOS) {
       ),
       comebackEventsPerGame: +mean(games.map((g) => g.comebackEvents)).toFixed(2),
     },
+    // 現実で多く使った人の勝率（50% なら使った金額は勝敗に関係ない）
+    higherSpenderWinRate: share(
+      games.filter((g) => g.winner !== -1 && g.players[0].totalSpent !== g.players[1].totalSpent && g.players[g.winner].totalSpent > g.players[1 - g.winner].totalSpent).length,
+      games.filter((g) => g.winner !== -1 && g.players[0].totalSpent !== g.players[1].totalSpent).length,
+    ),
+    // ミッションの成功が多かった人の勝率（高いほどミッションが勝敗に効いている）
+    moreMissionWinsWinRate: share(
+      games.filter((g) => g.winner !== -1 && g.players[0].missionWins !== g.players[1].missionWins && g.players[g.winner].missionWins > g.players[1 - g.winner].missionWins).length,
+      games.filter((g) => g.winner !== -1 && g.players[0].missionWins !== g.players[1].missionWins).length,
+    ),
     debtEverRate: share(players.filter((p) => p.wasInDebt).length, players.length),
     itemsUsedPerPlayer: +mean(players.map((p) => p.itemsUsed.length)).toFixed(2),
     itemWinRate: Object.fromEntries(

@@ -2,7 +2,7 @@ import type { ItemFunction } from './types';
 
 // 系統ごとのフォルダから処理をインポート
 import {
-  executeMoneySwap, executeMoneySplit, executeMoneyReset,
+  executeMoneySwap, executeMoneySplit,
   executeMissionSwap, executeBombyPass, executeItemSteal,
   executeTreat, executeMissionShare
 } from './attack';
@@ -19,13 +19,12 @@ import {
 } from './defense';
 
 // ==========================================
-// 📖 アイテム辞書（全19種。ダイス-2は廃止（2026-11-25））
+// 📖 アイテム辞書（全18種。ダイス-2（2026-11-25）と所持金リセット（2026-11-26）は廃止）
 // ==========================================
 export const ITEM_REGISTRY: Record<string, ItemFunction> = {
   // --- 妨害・逆転系 ---
   'i_money_swap': executeMoneySwap,
   'i_money_split': executeMoneySplit,
-  'i_money_reset': executeMoneyReset,
   'i_mission_swap': executeMissionSwap,
   'i_bomby_pass': executeBombyPass,
   'i_item_steal': executeItemSteal,

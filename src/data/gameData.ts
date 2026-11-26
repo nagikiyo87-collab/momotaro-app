@@ -229,7 +229,8 @@ export const STATION_PROPERTIES: Record<string, Property[]> = {
 // ==========================================
 // 🎯 ミッションデータ（全30種）
 // ==========================================
-export const MISSIONS: Mission[] = [
+/** ミッションの元の金額（報酬・ペナルティは下の MISSION_MONEY_SCALE 倍して使う） */
+const MISSIONS_BASE: Mission[] = [
   // 🔵 青マス（プラス） 10種
   { id: 'm_blue_1', name: '指定カラー探索', description: '街の中で「真っ黄色な看板」を見つけて写真を撮れ！', type: 'blue', reward: 500, penalty: 0, difficulty: 1 },
   { id: 'm_blue_2', name: '特定オブジェクト探索', description: '「犬」に関するもの（本物、看板、銅像など）の写真を撮れ！', type: 'blue', reward: 1000, penalty: 0, difficulty: 2 },
@@ -266,6 +267,17 @@ export const MISSIONS: Mission[] = [
   { id: 'm_green_9', name: '影絵アート', description: '2人の「影」を組み合わせて、地面に「ハートマーク」を作って撮影しろ！', type: 'green', reward: 800, penalty: 0, difficulty: 1 },
   { id: 'm_green_10', name: '振り返りシンクロ', description: '背中合わせで歩き出し、5歩目で同時に振り返って目が合えば成功！（ズレたら失敗）', type: 'green', reward: 1000, penalty: 0, difficulty: 2 },
 ];
+
+/**
+ * ミッションの金額の倍率（2026-11-26：1 → 3）。ミッションが勝敗に効くようにするため。
+ * 3 倍でミッションで動くお金が決算の収益と同じくらいになる（シミュレーション）。所持金半減はそのまま
+ */
+export const MISSION_MONEY_SCALE = 3;
+export const MISSIONS: Mission[] = MISSIONS_BASE.map((m) => ({
+  ...m,
+  reward: m.reward * MISSION_MONEY_SCALE,
+  penalty: m.penalty * MISSION_MONEY_SCALE,
+}));
 // ==========================================
 // 🎒 アイテムデータ（全22種）
 // ==========================================
@@ -273,7 +285,6 @@ export const ITEMS: Item[] = [
   // 妨害・逆転系
   { id: 'i_money_swap', name: '所持金入れ替え', description: '自分と相手の所持金をまるごと入れ替える', type: 'attack', rarity: 1 },
   { id: 'i_money_split', name: '割り勘カード', description: '2人の所持金を合計し、きっちり半分こにする', type: 'attack', rarity: 2 },
-  { id: 'i_money_reset', name: '所持金リセット', description: '相手の所持金を強制的に0にする', type: 'attack', rarity: 1 },
   { id: 'i_mission_swap', name: 'ミッション入れ替え', description: '自分と相手のミッションを強制的に入れ替える', type: 'attack', rarity: 2 },
   { id: 'i_bomby_pass', name: 'ボンビーなすりつけ', description: '持っているボンビーを相手に直接なすりつける', type: 'attack', rarity: 2 },
   { id: 'i_item_steal', name: 'アイテム強奪', description: '相手が持っているアイテムをランダムに1枚奪う', type: 'attack', rarity: 2 },
