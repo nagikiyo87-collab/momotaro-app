@@ -736,6 +736,7 @@ export const StationShopList: React.FC<{
                   {p.type === 'fixed' ? `固定 ${p.price.toLocaleString()}円（行けば購入できる）` : `上限 ${p.price.toLocaleString()}円まで`}
                   ・収益率 {p.rate}%（決算で +{income.toLocaleString()}円）
                 </div>
+                {p.note && <div style={{ fontSize: '0.75rem', color: '#d63031', fontWeight: 800 }}>⚠️ {p.note}</div>}
               </div>
               {onPick && (
                 <button

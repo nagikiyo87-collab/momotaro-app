@@ -4,6 +4,10 @@ export type Property = {
   price: number;
   rate: number;
   type: 'limit' | 'fixed';
+  /** ジャンル（書かなければ名前から判定） */
+  genre?: Genre;
+  /** 注意書き（定休日など） */
+  note?: string;
 };
 
 export type Mission = {
@@ -28,10 +32,10 @@ export type Item = {
 };
 
 // ==========================================
-// 🚉 マップ（駅）データ（京王線 全37駅）
+// 🚉 マップ（駅）データ（全39駅。新宿から京王新線で初台・幡ヶ谷を通り、笹塚から京王線。2026-11-26 ユーザーの案）
 // ==========================================
 export const STATIONS: string[] = [
-  '新宿', '笹塚', '代田橋', '明大前', '下高井戸', '桜上水', '上北沢', '八幡山', 
+  '新宿', '初台', '幡ヶ谷', '笹塚', '代田橋', '明大前', '下高井戸', '桜上水', '上北沢', '八幡山', 
   '芦花公園', '千歳烏山', '仙川', 'つつじヶ丘', '柴崎', '国領', '布田', '調布', 
   '西調布', '飛田給', '武蔵野台', '多磨霊園', '東府中', '府中', '分倍河原', 
   '中河原', '聖蹟桜ヶ丘', '百草園', '高幡不動', '南平', '平山城址公園', '長沼', 
@@ -39,7 +43,7 @@ export const STATIONS: string[] = [
 ];
 
 // ==========================================
-// 🏢 物件データ（全37駅分を仮設定）
+// 🏢 物件データ（全39駅。2026-11-26 ユーザーの案を反映。案の収益率は半分にして使う＝年2回の決算でバランスを取るため。案にない駅・枠は仮のまま）
 // ==========================================
 export const STATION_PROPERTIES: Record<string, Property[]> = {
   '新宿': [
@@ -47,74 +51,84 @@ export const STATION_PROPERTIES: Record<string, Property[]> = {
     { id: 'shinjuku_2', name: 'コンビニスイーツ', price: 500, rate: 100, type: 'limit' },
     { id: 'shinjuku_3', name: '新宿中央公園', price: 2000, rate: 20, type: 'fixed' },
   ],
+  '初台': [
+    { id: 'hatsudai_1', name: '代々木警察署のフリーペーパー', price: 500, rate: 20, type: 'fixed', genre: '名所', note: '1枚もらって帰る' },
+    { id: 'hatsudai_2', name: '渋谷区立図書館で涼む', price: 500, rate: 20, type: 'fixed', genre: '名所' },
+    { id: 'hatsudai_3', name: '東京オペラシティのくまざわ書店（本）', price: 2000, rate: 50, type: 'limit', genre: '買い物' },
+  ],
+  '幡ヶ谷': [
+    { id: 'hatagaya_1', name: 'コメダ珈琲', price: 1000, rate: 40, type: 'limit', genre: 'カフェ' },
+    { id: 'hatagaya_2', name: 'リフレッシュセンター リラックス（マッサージ）', price: 3000, rate: 60, type: 'limit', genre: '体験' },
+    { id: 'hatagaya_3', name: 'Gelateria Colore（ジェラート）', price: 1000, rate: 40, type: 'limit', genre: 'スイーツ', note: '月曜定休' },
+  ],
   '笹塚': [
-    { id: 'sasazuka_1', name: '高架下のパン屋', price: 800, rate: 60, type: 'limit' },
-    { id: 'sasazuka_2', name: 'ドラッグストア', price: 500, rate: 80, type: 'limit' },
-    { id: 'sasazuka_3', name: 'ボウリング場跡地', price: 1500, rate: 30, type: 'fixed' },
+    { id: 'sasazuka_1', name: 'あさひ自転車', price: 3000, rate: 40, type: 'limit', genre: '買い物' },
+    { id: 'sasazuka_2', name: 'ビアードパパ（シュークリーム）', price: 1000, rate: 40, type: 'limit', genre: 'スイーツ' },
+    { id: 'sasazuka_3', name: '笹塚ボウル（ボウリング）', price: 2000, rate: 50, type: 'limit', genre: '体験' },
   ],
   '代田橋': [
-    { id: 'daitabashi_1', name: '沖縄タウンの食堂', price: 1200, rate: 50, type: 'limit' },
-    { id: 'daitabashi_2', name: '駅前のコンビニ', price: 500, rate: 80, type: 'limit' },
-    { id: 'daitabashi_3', name: '和泉明本公園', price: 1000, rate: 40, type: 'fixed' },
+    { id: 'daitabashi_1', name: 'スリーコンカフェ 代田橋店', price: 1500, rate: 50, type: 'limit', genre: 'カフェ' },
+    { id: 'daitabashi_2', name: '京王ストア', price: 1000, rate: 40, type: 'limit', genre: '買い物' },
+    { id: 'daitabashi_3', name: '世田谷区立松原つみき公園', price: 1000, rate: 25, type: 'fixed', genre: '名所' },
   ],
   '明大前': [
-    { id: 'meidaimae_1', name: 'ファストフード', price: 1000, rate: 50, type: 'limit' },
-    { id: 'meidaimae_2', name: '商店街のたこ焼き', price: 800, rate: 80, type: 'limit' },
-    { id: 'meidaimae_3', name: '玉川上水公園', price: 1000, rate: 40, type: 'fixed' },
+    { id: 'meidaimae_1', name: '明治大学の生協でお土産', price: 1000, rate: 60, type: 'limit', genre: '買い物', note: 'または同じようなお店' },
+    { id: 'meidaimae_2', name: '高幡そば（駅構内）', price: 1000, rate: 50, type: 'limit', genre: 'グルメ' },
+    { id: 'meidaimae_3', name: 'ココカラファイン（飲食料品以外）', price: 1000, rate: 40, type: 'limit', genre: '買い物' },
   ],
   '下高井戸': [
-    { id: 'shimotakaido_1', name: '商店街のたい焼き', price: 500, rate: 100, type: 'limit' },
-    { id: 'shimotakaido_2', name: '映画館のチケット', price: 1800, rate: 40, type: 'limit' },
-    { id: 'shimotakaido_3', name: '菅原神社', price: 2000, rate: 20, type: 'fixed' },
+    { id: 'shimotakaido_1', name: '世田谷線に2駅以上乗る', price: 500, rate: 40, type: 'fixed', genre: '体験' },
+    { id: 'shimotakaido_2', name: '月見湯温泉', price: 1000, rate: 60, type: 'limit', genre: '体験' },
+    { id: 'shimotakaido_3', name: 'HEIM（カフェ）', price: 1000, rate: 50, type: 'limit', genre: 'カフェ' },
   ],
   '桜上水': [
-    { id: 'sakurajosui_1', name: '駅前のラーメン屋', price: 1000, rate: 60, type: 'limit' },
-    { id: 'sakurajosui_2', name: 'ローカルスーパー', price: 1500, rate: 40, type: 'limit' },
-    { id: 'sakurajosui_3', name: '桜並木通り', price: 1000, rate: 30, type: 'fixed' },
+    { id: 'sakurajosui_1', name: 'イトウ文具', price: 500, rate: 50, type: 'limit', genre: '買い物' },
+    { id: 'sakurajosui_2', name: 'ほぐしや 桜上水（マッサージ）', price: 3000, rate: 60, type: 'limit', genre: '体験' },
+    { id: 'sakurajosui_3', name: '武蔵野うどん', price: 2000, rate: 40, type: 'limit', genre: 'グルメ' },
   ],
   '上北沢': [
-    { id: 'kamikitazawa_1', name: 'ベーカリーのパン', price: 800, rate: 70, type: 'limit' },
-    { id: 'kamikitazawa_2', name: '薬局の日用品', price: 600, rate: 80, type: 'limit' },
-    { id: 'kamikitazawa_3', name: '賀川豊彦記念松沢資料館', price: 1500, rate: 20, type: 'fixed' },
+    { id: 'kamikitazawa_1', name: 'ファミリーマート', price: 500, rate: 40, type: 'limit', genre: '買い物' },
+    { id: 'kamikitazawa_2', name: 'みそ汁カフェ はちどり', price: 1500, rate: 50, type: 'limit', genre: 'グルメ' },
+    { id: 'kamikitazawa_3', name: '沿線で鉄道写真を1枚撮る', price: 500, rate: 20, type: 'fixed', genre: '名所' },
   ],
   '八幡山': [
-    { id: 'hachimanyama_1', name: '高架下のカフェ', price: 1000, rate: 50, type: 'limit' },
-    { id: 'hachimanyama_2', name: 'ラーメン屋の餃子', price: 600, rate: 80, type: 'limit' },
-    { id: 'hachimanyama_3', name: '八幡山公園', price: 1200, rate: 30, type: 'fixed' },
+    { id: 'hachimanyama_1', name: '八幡山公園まわりでお土産', price: 1000, rate: 60, type: 'limit', genre: '名所' },
+    { id: 'hachimanyama_2', name: 'ダイソー', price: 500, rate: 40, type: 'limit', genre: '買い物' },
+    { id: 'hachimanyama_3', name: 'サーティワン アイスクリーム', price: 800, rate: 40, type: 'limit', genre: 'スイーツ' },
   ],
   '芦花公園': [
-    { id: 'rokakoen_1', name: '洋菓子店のクッキー', price: 1000, rate: 60, type: 'limit' },
-    { id: 'rokakoen_2', name: 'スーパーの特売品', price: 500, rate: 100, type: 'limit' },
-    { id: 'rokakoen_3', name: '蘆花恒春園', price: 3000, rate: 15, type: 'fixed' },
+    { id: 'rokakoen_1', name: '蘆花恒春園', price: 1000, rate: 50, type: 'fixed', genre: '名所' },
+    { id: 'rokakoen_2', name: '喫茶どんぐり', price: 1000, rate: 50, type: 'limit', genre: 'カフェ' },
+    { id: 'rokakoen_3', name: 'スターバックス', price: 700, rate: 40, type: 'limit', genre: 'カフェ' },
   ],
   '千歳烏山': [
-    { id: 'karasuyama_1', name: '和菓子屋さん', price: 1200, rate: 50, type: 'limit' },
-    { id: 'karasuyama_2', name: '100円均一ショップ', price: 500, rate: 100, type: 'limit' },
-    { id: 'karasuyama_3', name: '烏山神社', price: 1500, rate: 20, type: 'fixed' },
+    { id: 'chitosekarasuyama_1', name: '西友（スーパー）', price: 700, rate: 40, type: 'limit', genre: '買い物' },
+    { id: 'chitosekarasuyama_2', name: 'ベッカライ徳多朗（パン屋）', price: 800, rate: 50, type: 'limit', genre: 'パン' },
+    { id: 'chitosekarasuyama_3', name: '小林洋菓子店', price: 1000, rate: 50, type: 'limit', genre: 'スイーツ' },
   ],
   '仙川': [
-    { id: 'sengawa_1', name: 'おしゃれなカフェランチ', price: 1500, rate: 40, type: 'limit' },
-    { id: 'sengawa_2', name: '雑貨屋の小物', price: 1000, rate: 60, type: 'limit' },
-    { id: 'sengawa_3', name: '仙川駅前公園', price: 1500, rate: 20, type: 'fixed' },
+    { id: 'sengawa_1', name: '仙川湯けむりの里', price: 1500, rate: 60, type: 'limit', genre: '体験' },
+    { id: 'sengawa_2', name: 'マヨテラス', price: 1000, rate: 60, type: 'limit', genre: '体験' },
+    { id: 'sengawa_3', name: 'スターバックス TEAVANA', price: 1500, rate: 50, type: 'limit', genre: 'カフェ' },
   ],
   'つつじヶ丘': [
-    { id: 'tsutsuji_1', name: '駅前の本屋', price: 1500, rate: 40, type: 'limit' },
-    { id: 'tsutsuji_2', name: 'お弁当屋さん', price: 800, rate: 60, type: 'limit' },
-    { id: 'tsutsuji_3', name: 'つつじの咲く公園', price: 1000, rate: 30, type: 'fixed' },
+    { id: 'tsutsujigaoka_1', name: '山本牛乳店', price: 1000, rate: 50, type: 'limit', genre: 'スイーツ' },
+    { id: 'tsutsujigaoka_2', name: '空と大地と', price: 1000, rate: 50, type: 'limit', genre: 'カフェ' },
+    { id: 'tsutsujigaoka_3', name: '札幌味噌麺 優', price: 1500, rate: 40, type: 'limit', genre: 'グルメ' },
   ],
   '柴崎': [
-    { id: 'shibasaki_1', name: '老舗の定食屋', price: 1000, rate: 60, type: 'limit' },
-    { id: 'shibasaki_2', name: '惣菜屋のコロッケ', price: 500, rate: 100, type: 'limit' },
-    { id: 'shibasaki_3', name: '柴崎稲荷神社', price: 1500, rate: 20, type: 'fixed' },
+    { id: 'shibasaki_1', name: '朝寿司', price: 2000, rate: 50, type: 'limit', genre: 'グルメ' },
+    { id: 'shibasaki_2', name: 'まいばすけっと', price: 1000, rate: 40, type: 'limit', genre: '買い物' },
+    { id: 'shibasaki_3', name: 'ぎょうざの満洲', price: 1000, rate: 50, type: 'limit', genre: 'グルメ' },
   ],
   '国領': [
-    { id: 'kokuryo_1', name: '駅前ビルのレストラン', price: 2000, rate: 40, type: 'limit' },
-    { id: 'kokuryo_2', name: 'ケーキ屋さんのケーキ', price: 1200, rate: 50, type: 'limit' },
-    { id: 'kokuryo_3', name: '国領神社', price: 2000, rate: 20, type: 'fixed' },
+    { id: 'kokuryo_1', name: 'マルエツ', price: 700, rate: 40, type: 'limit', genre: '買い物' },
+    { id: 'kokuryo_2', name: 'イトーヨーカドー', price: 1000, rate: 50, type: 'limit', genre: '買い物' },
+    { id: 'kokuryo_3', name: 'カフェ ほっとれーる', price: 1000, rate: 50, type: 'limit', genre: 'カフェ' },
   ],
   '布田': [
-    { id: 'fuda_1', name: '蕎麦屋の天ざる', price: 1500, rate: 50, type: 'limit' },
-    { id: 'fuda_2', name: '駅前のパン屋', price: 800, rate: 80, type: 'limit' },
+    { id: 'fuda_1', name: 'MOCOFFEE（モッコーヒー）', price: 1000, rate: 50, type: 'limit', genre: 'カフェ' },
+    { id: 'fuda_2', name: 'Oklm（カフェ）', price: 1000, rate: 50, type: 'limit', genre: 'カフェ' },
     { id: 'fuda_3', name: '布多天神社参道', price: 1500, rate: 20, type: 'fixed' },
   ],
   '調布': [
@@ -148,7 +162,7 @@ export const STATION_PROPERTIES: Record<string, Property[]> = {
     { id: 'higashifuchu_3', name: '府中の森公園', price: 3000, rate: 20, type: 'fixed' },
   ],
   '府中': [
-    { id: 'fuchu_1', name: '駅ビルのレストラン', price: 2000, rate: 40, type: 'limit' },
+    { id: 'fuchu_1', name: 'タイトーステーション くるる府中店（UFOキャッチャー）', price: 3000, rate: 75, type: 'limit', genre: '体験' },
     { id: 'fuchu_2', name: '老舗のたい焼き屋', price: 500, rate: 80, type: 'limit' },
     { id: 'fuchu_3', name: '大國魂神社', price: 4000, rate: 15, type: 'fixed' },
   ],
@@ -173,7 +187,7 @@ export const STATION_PROPERTIES: Record<string, Property[]> = {
     { id: 'mogusaen_3', name: '京王百草園', price: 2500, rate: 20, type: 'fixed' },
   ],
   '高幡不動': [
-    { id: 'takahata_1', name: '参道のソフトクリーム', price: 500, rate: 100, type: 'limit' },
+    { id: 'takahata_1', name: '多摩モノレールに往復乗る（500円以内の区間）', price: 500, rate: 60, type: 'limit', genre: '体験' },
     { id: 'takahata_2', name: '名物のお蕎麦屋さん', price: 1500, rate: 40, type: 'limit' },
     { id: 'takahata_3', name: '高幡不動尊', price: 3500, rate: 15, type: 'fixed' },
   ],
@@ -203,9 +217,9 @@ export const STATION_PROPERTIES: Record<string, Property[]> = {
     { id: 'katakura_3', name: '片倉城跡公園', price: 2000, rate: 20, type: 'fixed' },
   ],
   '山田': [
-    { id: 'yamada_1', name: '地元の洋食屋', price: 1500, rate: 50, type: 'limit' },
-    { id: 'yamada_2', name: 'ファミレスのデザート', price: 800, rate: 70, type: 'limit' },
-    { id: 'yamada_3', name: '廣園寺', price: 1500, rate: 20, type: 'fixed' },
+    { id: 'yamada_1', name: '天津餃子房', price: 2000, rate: 50, type: 'limit', genre: 'グルメ' },
+    { id: 'yamada_2', name: 'ローソンストア100', price: 500, rate: 40, type: 'limit', genre: '買い物' },
+    { id: 'yamada_3', name: 'ココテラス（カレー専門店）', price: 2000, rate: 50, type: 'limit', genre: 'グルメ' },
   ],
   'めじろ台': [
     { id: 'mejirodai_1', name: '学生街のガッツリ定食', price: 1200, rate: 60, type: 'limit' },
@@ -428,12 +442,12 @@ export const RANK_THRESHOLDS = { S: 20000, A: 10000, B: 3500 };
 // ==========================================
 // 🏷️ 物件のジャンルと「ジャンル集めボーナス」（2026-11-26）
 // ==========================================
-export type Genre = 'カフェ' | 'パン' | 'スイーツ' | 'グルメ' | '買い物' | '名所';
-export const GENRES: Genre[] = ['カフェ', 'パン', 'スイーツ', 'グルメ', '買い物', '名所'];
-export const GENRE_ICON: Record<Genre, string> = { カフェ: '☕', パン: '🥐', スイーツ: '🍰', グルメ: '🍜', 買い物: '🛍️', 名所: '⛩️' };
+export type Genre = 'カフェ' | 'パン' | 'スイーツ' | 'グルメ' | '買い物' | '体験' | '名所';
+export const GENRES: Genre[] = ['カフェ', 'パン', 'スイーツ', 'グルメ', '買い物', '体験', '名所'];
+export const GENRE_ICON: Record<Genre, string> = { カフェ: '☕', パン: '🥐', スイーツ: '🍰', グルメ: '🍜', 買い物: '🛍️', 体験: '🎟️', 名所: '⛩️' };
 
 /** 物件の名前からジャンルを決める（物件を本決まりにするときは、物件データに genre を書けばそちらを優先） */
-export const genreOf = (p: Property & { genre?: Genre }): Genre => {
+export const genreOf = (p: Property): Genre => {
   if (p.genre) return p.genre;
   if (p.type === 'fixed') return '名所';
   const n = p.name;
