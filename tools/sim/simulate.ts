@@ -11,7 +11,7 @@
  * 現実の行動は計算できないので、下の SCENARIOS の数字で仮定する（2026-11-24 ユーザー了承）
  */
 import { writeFileSync, mkdirSync } from 'node:fs';
-import { STATIONS, STATION_PROPERTIES, MISSIONS, ITEMS, SHIELD_ID, RANK_THRESHOLDS, pickItemIndexByRarity, type Property, type Mission } from '../../src/data/gameData.ts';
+import { STATIONS, STATION_PROPERTIES, MISSIONS, ITEMS, SHIELD_ID, RANK_THRESHOLDS, pickItemIndexByRarity, propertyIncome, type Property, type Mission } from '../../src/data/gameData.ts';
 
 // ---------------------------------------------------------------- 仮定
 type Scenario = {
@@ -165,6 +165,12 @@ const SCENARIOS: Scenario[] = [
         const V6: Scenario = { ...V4, id: 'v6', label: '【v6】所持金5,000＋滞在30・40分多め（2人の出費に差をつける）', startMoney: 5000, stayTimes: [{ min: 30, w: 35 }, { min: 40, w: 35 }, { min: 50, w: 15 }, { min: 60, w: 15 }], spendSpread: true };
         return [
           V6,
+          {
+            ...V6,
+            id: 'v7',
+            label: '【v7 実装】v6＋ミッション3倍＋ご当地グルメ＋ジャンル集め＋思い出（1駅1,000円まで）・所持金リセットなし',
+            spendAsset: { ratio: 1, cap: 1000 },
+          },
           { ...V6, id: 'v6_m2', label: '【案】ミッションの金額 2 倍（※2026-11-26 にアプリ側を 3 倍にしたので、今は元の 6 倍）', missionScale: 2 },
           { ...V6, id: 'v6_m3', label: '【案】ミッションの金額 3 倍（※アプリ側が 3 倍になったので、今は元の 9 倍）', missionScale: 3 },
           { ...V6, id: 'v6_spend_full', label: '【案】使った金額を全額資産に（上限なし）', spendAsset: { ratio: 1 } },
@@ -286,7 +292,8 @@ const applyMoney = (p: Player, change: number, bucket: keyof Player) => {
 };
 
 const assets = (p: Player) => p.money + p.memories + p.props.reduce((s, x) => s + x.price, 0);
-const income = (p: Player) => p.props.reduce((s, x) => s + Math.floor(x.price * (x.rate / 100)), 0);
+// 決算の収益：アプリと同じ（ジャンル集めボーナス込み。2026-11-26〜）
+const income = (p: Player) => propertyIncome(p.props).income;
 
 // ご褒美ランク：アプリと同じ基準（gameData.ts の RANK_THRESHOLDS）
 const rank = (diff: number) => (diff >= RANK_THRESHOLDS.S ? 'S' : diff >= RANK_THRESHOLDS.A ? 'A' : diff >= RANK_THRESHOLDS.B ? 'B' : 'C');

@@ -134,7 +134,7 @@ export const RuleModal: React.FC<Props> = ({ isOpen, onClose, onAdjustMoney }) =
                     ② 着いた駅のマスの色でミッションが決まり、滞在時間（30・40・50・60分。30分と40分が出やすい）もランダムで決まる。<br/>
                     ③ 行きたい所は「目的地メモ」にいつでも追加（Googleマップの場所も貼り付けられる）。出発するときにタイマーをスタート。<br/>
                     ④ 制限時間内にミッションを実行する。<br/>
-                    ⑤ 滞在中の飲食や買い物は自由に楽しんでOK（ゲームの所持金からは引かれません）。<br/>
+                    ⑤ 滞在中の飲食や買い物は自由に楽しんでOK（ゲームの所持金からは引かれません）。使った金額を記録すると、1駅1,000円まで「思い出」として総資産に加わります。レシートの写真も残せます。<br/>
                     ⑥ その駅の「物件」をシークレット入札で購入する。<br/>
                     ⑦ 夏と冬の終わりに決算（物件の収益受け取り）が発生します（年2回）。<br/><br/>
                     **【最初の所持金】** 5,000円
@@ -181,7 +181,7 @@ export const RuleModal: React.FC<Props> = ({ isOpen, onClose, onAdjustMoney }) =
                 <div>
                   <h3 style={{ color: '#2c3e50', borderBottom: '2px solid #ecf0f1', paddingBottom: '8px', marginBottom: '15px' }}>📍 マスの種類とペナルティ</h3>
                   <ul style={{ fontSize: '0.9rem', lineHeight: '1.6', color: '#34495e', paddingLeft: '20px', marginBottom: '15px' }}>
-                    <li><b style={{ color: '#3498db' }}>🔵 青マス</b>：成功でお金がもらえる！</li>
+                    <li><b style={{ color: '#3498db' }}>🔵 青マス</b>：成功でお金がもらえる！（🍡 ご当地グルメミッションもあるよ）</li>
                     <li><b style={{ color: '#e74c3c' }}>🔴 赤マス</b>：失敗するとお金が減るか半分に…！</li>
                     <li><b style={{ color: '#2ecc71' }}>🟢 協力マス</b>：2人で成功すればボーナス！</li>
                     <li><b style={{ color: '#f1c40f' }}>🟡 アイテムマス</b>：成功するとアイテムGET！</li>
@@ -197,6 +197,7 @@ export const RuleModal: React.FC<Props> = ({ isOpen, onClose, onAdjustMoney }) =
                   <h3 style={{ color: '#2c3e50', borderBottom: '2px solid #ecf0f1', paddingBottom: '8px', marginBottom: '15px' }}>🏢 物件と借金</h3>
                   <p style={{ fontSize: '0.9rem', lineHeight: '1.6', color: '#34495e' }}>
                     ・物件のお店で実際に使った金額が、そのまま入札額になります（0円では買えません）。<br/>
+                    ・<b>ジャンル集めボーナス</b>：同じジャンル（カフェ・パン・スイーツ・グルメ・買い物・名所）の物件を3つ集めると、そのジャンルの決算の収益が2倍になります。<br/>
                     ・上限額を超えて買っても、ゲーム内では上限額として計算されます。<br/>
                     <span style={{ fontWeight: 'bold', color: '#8e44ad' }}>・公園などの「固定値」スポットは、入札額の入力は不要で、固定の金額が引かれます。</span><br/>
                     ・相手と同じ物件を選んだ場合は、**「実際の購入額が高い方」**が獲得します。（同額ならサイコロ勝負）<br/>

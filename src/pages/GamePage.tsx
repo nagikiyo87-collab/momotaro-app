@@ -1,14 +1,15 @@
 import React, { useState, useEffect, lazy, Suspense } from 'react';
 import { useGameSync } from '../hooks/useGameSync';
 import { useTurnActions } from '../hooks/useTurnActions';
-import { STATIONS, STATION_PROPERTIES, MISSIONS, ITEMS, PASSIVE_ITEMS, getStationSquares } from '../data/gameData'; 
+import { STATIONS, STATION_PROPERTIES, MISSIONS, ITEMS, PASSIVE_ITEMS, MEMORY_CAP_PER_STATION, getStationSquares } from '../data/gameData'; 
 import { RuleModal } from '../components/RuleModal';
-import { GameHeader, PlayerCards, BottomNav, SeasonalBackground, StationShopList, MissionPhaseUI, SpendingPhaseUI, BiddingPhaseUI, ResultPhaseUI } from '../components/GameUI';
+import { GameHeader, PlayerCards, BottomNav, SeasonalBackground, StationShopList, ShoppingPanel, MissionPhaseUI, SpendingPhaseUI, BiddingPhaseUI, ResultPhaseUI } from '../components/GameUI';
 import { motion, AnimatePresence } from 'framer-motion';
 import { doc, updateDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { QRCodeSVG } from 'qrcode.react'; 
 import { RouteMap } from '../components/map/RouteMap';
+import { useReceipts } from '../hooks/useReceipts';
 import '../styles/index.css'; 
 
 // 3D サイコロ（three.js を含むので、ゲーム画面に入ってから別に読み込む。タイトル画面は軽いまま）
@@ -34,6 +35,8 @@ export const GamePage: React.FC<Props> = ({ roomId, userId }) => {
 
   const actions = useTurnActions(roomId, userId, roomData, me, opponent, opponentId, currentProperties);
   const phase = roomData?.phase || 'dice';
+  // その駅のレシートの写真（2 人分）
+  const receiptStore = useReceipts(roomId, sharedPosition);
 
   useEffect(() => {
     if (!roomId || !userId) return;
@@ -350,6 +353,19 @@ export const GamePage: React.FC<Props> = ({ roomId, userId }) => {
                         isMyTurn={isMyTurn} 
                         onEndMission={(mySuccess, opSuccess) => actions.handleEndMission(mySuccess, opSuccess, myMission, opponentMission)} 
                       />
+                      {/* この駅での買い物：使った金額（思い出ボーナス）とレシートの写真 */}
+                      <ShoppingPanel
+                        userId={userId}
+                        opponentName={opponent?.name || '相手'}
+                        mySpending={roomData?.spendings?.[userId]}
+                        opSpending={opponentId ? roomData?.spendings?.[opponentId] : undefined}
+                        cap={MEMORY_CAP_PER_STATION}
+                        onSetSpending={actions.handleSetSpending}
+                        receipts={receiptStore.receipts}
+                        receiptError={receiptStore.error}
+                        onAddReceipt={(file) => receiptStore.addReceipt(userId, file)}
+                        onRemoveReceipt={(id) => { void receiptStore.removeReceipt(id); }}
+                      />
                       {/* ミッション中も、この駅で買える物件を見られるように */}
                       <StationShopList stationName={currentStationName} properties={currentProperties} onPick={actions.handleAddDestinationNote} />
                     </>
@@ -370,6 +386,21 @@ export const GamePage: React.FC<Props> = ({ roomId, userId }) => {
 
                   {phase === 'bidding' && (
                     <BiddingPhaseUI stayTime={roomData?.stayTime || 0} currentProperties={currentProperties} selectedPropertyId={actions.selectedPropertyId} setSelectedPropertyId={actions.setSelectedPropertyId} bidAmount={actions.bidAmount} setBidAmount={actions.setBidAmount} myBid={roomData?.bids?.[userId]} opponentBid={roomData?.bids?.[opponentId!]} bothSubmitted={!!(roomData?.bids?.[userId] && roomData?.bids?.[opponentId!])} isMyTurn={isMyTurn} onSubmitBid={actions.handleSubmitBid} onRevealBids={() => actions.handleRevealBids(roomData.bids[userId], roomData.bids[opponentId!])} myMoney={me?.money || 0} />
+                  )}
+                  {phase === 'bidding' && (
+                    // 入札の証拠として、この駅のレシートを見られるように
+                    <ShoppingPanel
+                      userId={userId}
+                      opponentName={opponent?.name || '相手'}
+                      mySpending={roomData?.spendings?.[userId]}
+                      opSpending={opponentId ? roomData?.spendings?.[opponentId] : undefined}
+                      cap={MEMORY_CAP_PER_STATION}
+                      onSetSpending={actions.handleSetSpending}
+                      receipts={receiptStore.receipts}
+                      receiptError={receiptStore.error}
+                      onAddReceipt={(file) => receiptStore.addReceipt(userId, file)}
+                      onRemoveReceipt={(id) => { void receiptStore.removeReceipt(id); }}
+                    />
                   )}
 
                   {phase === 'bomby' && (

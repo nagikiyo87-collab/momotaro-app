@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { QRCodeSVG } from 'qrcode.react';
-import { ITEMS, START_MONEY, RANK_THRESHOLDS, type Mission, type Property } from '../data/gameData';
+import { ITEMS, START_MONEY, RANK_THRESHOLDS, GENRES, GENRE_ICON, GENRE_BONUS_THRESHOLD, countGenres, genreOf, totalAssetsOf, type Mission, type Property } from '../data/gameData';
 import { useModal } from '../contexts/ModalContext';
 import { doc, updateDoc } from 'firebase/firestore';
 import { db } from '../firebase';
@@ -107,6 +107,18 @@ export const PlayerCards: React.FC<{
               <p style={{ color: '#aaa', fontSize: '0.9rem', marginBottom: '20px' }}>アイテムは持っていません。</p>
             )}
 
+            {/* ジャンル集め：同じジャンルを 3 つ集めると、そのジャンルの決算の収益が 2 倍 */}
+            <h4 style={{ color: '#2c3e50', borderBottom: '2px solid #ecf0f1', paddingBottom: '5px', marginBottom: '10px' }}>🏷️ ジャンル集め（{GENRE_BONUS_THRESHOLD}つで収益2倍）</h4>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 20 }}>
+              {(() => {
+                const c = countGenres(playerProperties);
+                return GENRES.map((g) => (
+                  <span key={g} style={{ padding: '4px 8px', borderRadius: 999, fontSize: '0.8rem', fontWeight: 800, background: c[g] >= GENRE_BONUS_THRESHOLD ? '#ffeaa7' : '#f1f2f6', color: '#2d3436', border: c[g] >= GENRE_BONUS_THRESHOLD ? '2px solid #fdcb6e' : '2px solid transparent' }}>
+                    {GENRE_ICON[g]} {g} {Math.min(c[g], GENRE_BONUS_THRESHOLD)}/{GENRE_BONUS_THRESHOLD}{c[g] >= GENRE_BONUS_THRESHOLD ? ' ✨2倍' : ''}
+                  </span>
+                ));
+              })()}
+            </div>
             <h4 style={{ color: '#2c3e50', borderBottom: '2px solid #ecf0f1', paddingBottom: '5px', marginBottom: '10px' }}>🏠 所有物件 ({playerProperties.length}件)</h4>
             {playerProperties.length > 0 ? (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
@@ -198,7 +210,7 @@ export const PlayerCards: React.FC<{
           {slides.map((sl) => {
             const p = sl.player;
             const possessed = !!p && bombyPossessedId === sl.uid;
-            const total = (p?.money || 0) + (p?.properties || []).reduce((sum: number, x: Property) => sum + x.price, 0);
+            const total = totalAssetsOf(p); // 所持金＋物件＋思い出
             return (
               <div key={sl.key} style={{ minWidth: '100%', boxSizing: 'border-box', padding: '14px 16px 18px' }}>
                 {p ? (
@@ -218,6 +230,7 @@ export const PlayerCards: React.FC<{
                     <div style={{ display: 'flex', gap: 12, marginTop: 6, fontSize: '0.9rem', fontWeight: 800, color: '#57606f', flexWrap: 'wrap' }}>
                       <span>🏠 {p.properties?.length || 0}件</span>
                       <span>🎒 {p.items?.length || 0}/3</span>
+                      {(p.memories || 0) > 0 && <span>🛍️ 思い出 {p.memories.toLocaleString()}円</span>}
                       {possessed && <span style={{ color: '#8e44ad' }}>{getBombyIcon(bombyType)} 貧乏神が憑いている</span>}
                     </div>
                     <button onClick={() => setDetailPlayer(sl.key)} style={{ marginTop: 8, width: '100%', border: 'none', borderRadius: 999, padding: '8px 0', background: '#f1f2f6', color: '#2f3542', fontWeight: 800, fontSize: '0.85rem', cursor: 'pointer' }}>
@@ -418,6 +431,7 @@ export const MissionPhaseUI: React.FC<{
               <div style={{ fontSize: '0.9rem', fontWeight: '800', color: currentSquare.text, marginBottom: '6px' }}>{shared ? '👥 2人の協力ミッション' : '👤 あなたのミッション'}</div>
               <div style={{ fontWeight: '800', fontSize: '1.1rem', marginBottom: '6px' }}>{myMission.name}</div>
               <p style={{ margin: '0', fontSize: '0.95rem', fontWeight: 'bold' }}>{myMission.description}</p>
+              {myMission.tag === 'gourmet' && <GourmetBadge />}
               {renderRewardBadge(myMission, squareType)}
               <ResultPicker value={myResult} onChange={(v) => onSetResult('me', v)} />
             </div>
@@ -427,6 +441,7 @@ export const MissionPhaseUI: React.FC<{
               <div style={{ fontSize: '0.9rem', fontWeight: '800', color: currentSquare.text, marginBottom: '6px' }}>👤 {opponentName}のミッション</div>
               <div style={{ fontWeight: '800', fontSize: '1.1rem', marginBottom: '6px' }}>{opponentMission.name}</div>
               <p style={{ margin: '0', fontSize: '0.95rem', fontWeight: 'bold' }}>{opponentMission.description}</p>
+              {opponentMission.tag === 'gourmet' && <GourmetBadge />}
               {renderRewardBadge(opponentMission, squareType)}
               <ResultPicker value={opResult} onChange={(v) => onSetResult('op', v)} />
             </div>
@@ -603,7 +618,7 @@ export const ResultPhaseUI: React.FC<{ me: any; opponent: any }> = ({ me, oppone
 
   const calculateTotalAsset = (player: any) => {
     if (!player) return 0;
-    return (player.money || 0) + (player.properties || []).reduce((sum: number, p: any) => sum + p.price, 0);
+    return totalAssetsOf(player); // 所持金＋物件＋思い出
   };
 
   const getRankAndReward = (diff: number) => {
@@ -716,7 +731,7 @@ export const StationShopList: React.FC<{
           return (
             <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: '10px', background: '#fffbf0', borderRadius: '10px', padding: '8px 10px' }}>
               <div style={{ flex: 1 }}>
-                <div style={{ fontWeight: 800, color: '#2d3436', fontSize: '0.95rem' }}>{p.name}</div>
+                <div style={{ fontWeight: 800, color: '#2d3436', fontSize: '0.95rem' }}>{p.name} <span style={{ fontSize: '0.72rem', color: '#6c5ce7' }}>{GENRE_ICON[genreOf(p)]} {genreOf(p)}</span></div>
                 <div style={{ fontSize: '0.78rem', color: '#636e72', fontWeight: 700 }}>
                   {p.type === 'fixed' ? `固定 ${p.price.toLocaleString()}円（行けば購入できる）` : `上限 ${p.price.toLocaleString()}円まで`}
                   ・収益率 {p.rate}%（決算で +{income.toLocaleString()}円）
@@ -924,3 +939,134 @@ const ResultPicker: React.FC<{ value: boolean | null; onChange: (success: boolea
     </div>
   );
 };
+
+// ==========================================
+// 🛍️ この駅での買い物（思い出ボーナス＋レシートの写真）
+// ==========================================
+type ReceiptView = { id: string; uid: string; image: string };
+
+/**
+ * この駅で使った金額を入れて、1 駅 cap 円まで「思い出」として総資産に足す。
+ * レシートの写真を撮って、入札額や使った金額の証拠として 2 人で見られる
+ */
+export const ShoppingPanel: React.FC<{
+  userId: string;
+  opponentName: string;
+  mySpending?: number;
+  opSpending?: number;
+  cap: number;
+  onSetSpending: (amount: number) => void;
+  receipts: ReceiptView[];
+  receiptError: string | null;
+  onAddReceipt: (file: File) => Promise<void>;
+  onRemoveReceipt: (id: string) => void;
+}> = ({ userId, opponentName, mySpending, opSpending, cap, onSetSpending, receipts, receiptError, onAddReceipt, onRemoveReceipt }) => {
+  const [draft, setDraft] = useState('');
+  const [uploading, setUploading] = useState(false);
+  const [viewing, setViewing] = useState<string | null>(null);
+  const bonus = (n?: number) => Math.min(n || 0, cap);
+
+  return (
+    <div style={{ background: '#fff', padding: '14px', borderRadius: '16px', border: '3px solid #a29bfe', marginTop: '15px', textAlign: 'left' }}>
+      <p style={{ margin: '0 0 4px 0', fontWeight: 900, color: '#6c5ce7', fontSize: '1rem' }}>🛍️ この駅での買い物</p>
+      <p style={{ margin: '0 0 10px 0', fontSize: '0.78rem', color: '#636e72', fontWeight: 700 }}>
+        使った金額は「思い出」として、1駅 {cap.toLocaleString()}円まで総資産に加わります（所持金は減りません）
+      </p>
+
+      <div style={{ display: 'flex', gap: 8 }}>
+        <input
+          type="text"
+          inputMode="numeric"
+          placeholder={mySpending !== undefined ? `入力済み: ${mySpending}円` : '使った金額（円）'}
+          value={draft}
+          onChange={(e) => setDraft(e.target.value.replace(/[^0-9]/g, ''))}
+          style={{ flex: 1, padding: '10px', borderRadius: 8, border: '2px solid #bdc3c7', fontSize: '1rem', fontWeight: 800, minWidth: 0 }}
+        />
+        <button
+          className="btn-pop btn-purple"
+          style={{ width: 'auto', padding: '8px 14px', fontSize: '0.9rem' }}
+          disabled={draft === ''}
+          onClick={() => {
+            onSetSpending(Number(draft));
+            setDraft('');
+          }}
+        >
+          記録
+        </button>
+      </div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 8, fontSize: '0.82rem', fontWeight: 800, color: '#2d3436' }}>
+        <span>あなた：{mySpending !== undefined ? `${mySpending.toLocaleString()}円 → 思い出 +${bonus(mySpending).toLocaleString()}円` : 'まだ'}</span>
+        <span>{opponentName}：{opSpending !== undefined ? `+${bonus(opSpending).toLocaleString()}円` : 'まだ'}</span>
+      </div>
+
+      {/* レシートの写真 */}
+      <div style={{ marginTop: 12, borderTop: '2px dashed #dfe6e9', paddingTop: 10 }}>
+        <label style={{ display: 'block', textAlign: 'center', background: '#f1f2f6', borderRadius: 999, padding: '9px 0', fontWeight: 800, fontSize: '0.88rem', color: '#2f3542', cursor: 'pointer' }}>
+          {uploading ? '📤 保存しています…' : '📷 レシートを撮る・選ぶ'}
+          <input
+            type="file"
+            accept="image/*"
+            capture="environment"
+            style={{ display: 'none' }}
+            disabled={uploading}
+            onChange={async (e) => {
+              const file = e.target.files?.[0];
+              e.target.value = '';
+              if (!file) return;
+              setUploading(true);
+              try {
+                await onAddReceipt(file);
+              } catch {
+                alert('レシートを保存できませんでした。通信の状態か、Firebase のルール設定を確認してください。');
+              } finally {
+                setUploading(false);
+              }
+            }}
+          />
+        </label>
+        {receiptError === 'permission' && (
+          <p style={{ margin: '6px 0 0', fontSize: '0.75rem', color: '#d63031', fontWeight: 700 }}>
+            レシートを保存する許可がありません（Firebase のルールに receipts の設定が必要です）
+          </p>
+        )}
+        {receipts.length > 0 && (
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 10 }}>
+            {receipts.map((r) => (
+              <div key={r.id} style={{ position: 'relative' }}>
+                <img
+                  src={r.image}
+                  alt="レシート"
+                  onClick={() => setViewing(r.image)}
+                  style={{ width: 64, height: 64, objectFit: 'cover', borderRadius: 8, border: `3px solid ${r.uid === userId ? '#e5367a' : '#1e6fd9'}`, cursor: 'pointer' }}
+                />
+                {r.uid === userId && (
+                  <button
+                    onClick={() => onRemoveReceipt(r.id)}
+                    aria-label="レシートを削除"
+                    style={{ position: 'absolute', top: -6, right: -6, width: 20, height: 20, borderRadius: '50%', border: 'none', background: '#636e72', color: '#fff', fontSize: 11, cursor: 'pointer', lineHeight: '20px', padding: 0 }}
+                  >
+                    ✕
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* 拡大表示 */}
+      {viewing && (
+        <div onClick={() => setViewing(null)} style={{ position: 'fixed', inset: 0, zIndex: 600, background: 'rgba(0,0,0,0.85)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+          <img src={viewing} alt="レシート" style={{ maxWidth: '100%', maxHeight: '90vh', borderRadius: 8 }} />
+        </div>
+      )}
+    </div>
+  );
+};
+
+/** ご当地グルメミッションの印 */
+const GourmetBadge = () => (
+  <span style={{ display: 'inline-block', marginTop: 8, background: '#fff3e0', color: '#e17055', border: '2px solid #fab1a0', borderRadius: 999, padding: '2px 10px', fontSize: '0.78rem', fontWeight: 900 }}>
+    🍡 ご当地グルメ
+  </span>
+);

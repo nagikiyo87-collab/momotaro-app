@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { doc, updateDoc, deleteField, arrayUnion, arrayRemove } from 'firebase/firestore';
 import { db } from '../firebase';
-import { pickStayTime, getStationSquares, STATIONS, MISSIONS, ITEMS, SHIELD_ID, isAttackItem, pickItemIndexByRarity, SETTLEMENT_SEASONS, DEBT_INTEREST_RATE, DEBT_INTEREST_SEASON, BOMBY_REFORM, type Mission, type Property } from '../data/gameData';
+import { pickStayTime, getStationSquares, STATIONS, MISSIONS, ITEMS, SHIELD_ID, isAttackItem, pickItemIndexByRarity, SETTLEMENT_SEASONS, DEBT_INTEREST_RATE, DEBT_INTEREST_SEASON, BOMBY_REFORM, MEMORY_CAP_PER_STATION, propertyIncome, totalAssetsOf, type Mission, type Property } from '../data/gameData';
 import { useModal } from '../contexts/ModalContext';
 import { ITEM_REGISTRY } from '../game/items/itemRegistry';
 import type { ItemContext } from '../game/items/types';
@@ -186,6 +186,7 @@ export const useTurnActions = (
       phase: 'mission',
       destinationNotes: [],
       missionResults: {},
+      spendings: {}, // この駅で使った金額（思い出ボーナス用）
       missionTimer: { isRunning: false, remainingSeconds: stayTime * 60, endTime: null },
     };
   };
@@ -208,6 +209,12 @@ export const useTurnActions = (
   };
   const handleRemoveDestinationNote = (note: string) => {
     updateDoc(doc(db, 'rooms', roomId), { destinationNotes: arrayRemove(note) }).catch(console.error);
+  };
+
+  /** この駅で使った金額を入れる（思い出ボーナス：1 駅 MEMORY_CAP_PER_STATION 円まで総資産に足す） */
+  const handleSetSpending = (amount: number) => {
+    const v = Math.max(0, Math.floor(amount || 0));
+    updateDoc(doc(db, 'rooms', roomId), { [`spendings.${userId}`]: v }).catch(console.error);
   };
 
   /**
@@ -453,11 +460,13 @@ export const useTurnActions = (
 
     // 決算は年 2 回（夏・冬）。物件の収益を受け取る
     if (SETTLEMENT_SEASONS.includes(currentSeason)) {
-      const calculateIncome = (props: Property[]) => props.reduce((sum, prop) => sum + Math.floor(prop.price * (prop.rate / 100)), 0);
-      const myIncome = calculateIncome(myProperties); const opponentIncome = calculateIncome(opponentProperties);
+      // 同じジャンルの物件を 3 つ以上持っていると、そのジャンルの収益が 2 倍（ジャンル集めボーナス）
+      const mine = propertyIncome(myProperties); const theirs = propertyIncome(opponentProperties);
+      const myIncome = mine.income; const opponentIncome = theirs.income;
       myNewMoney += myIncome; opponentNewMoney += opponentIncome;
       const seasonName = currentSeason === 'summer' ? '夏' : '冬';
-      alertMessage += `\n\n🌸🌸🌸 ${seasonName}の決算 🌸🌸🌸\n半年分の収益が振り込まれました！\nあなた: +${myIncome}円\nあいて: +${opponentIncome}円`;
+      const bonusText = (g: string[]) => (g.length ? `（ジャンル集めボーナス：${g.join('・')} 2倍！）` : '');
+      alertMessage += `\n\n🌸🌸🌸 ${seasonName}の決算 🌸🌸🌸\n半年分の収益が振り込まれました！\nあなた: +${myIncome}円${bonusText(mine.bonusGenres)}\nあいて: +${opponentIncome}円${bonusText(theirs.bonusGenres)}`;
     }
 
     // 借金の利息は冬の決算時だけ（以前は毎ターン 20%。借金が雪だるま式に増えていた）
@@ -469,6 +478,13 @@ export const useTurnActions = (
     }
     if (myDebtMsg || opDebtMsg) alertMessage += `\n\n💸💸💸 借金利息発生 💸💸💸${myDebtMsg}${opDebtMsg}`;
 
+    // 思い出ボーナス：この駅で使った金額を、1 駅 MEMORY_CAP_PER_STATION 円まで総資産に足す（ターンの終わりに）
+    const myMemoryAdd = Math.min(Number(roomData?.spendings?.[userId] || 0), MEMORY_CAP_PER_STATION);
+    const opMemoryAdd = Math.min(Number(roomData?.spendings?.[opponentId] || 0), MEMORY_CAP_PER_STATION);
+    if (myMemoryAdd > 0 || opMemoryAdd > 0) {
+      alertMessage += `\n\n🛍️ 思い出ボーナス（総資産に加算）\nあなた: +${myMemoryAdd}円\nあいて: +${opMemoryAdd}円`;
+    }
+
     await showAlert(alertMessage);
     const isGoal = sharedPosition === STATIONS.length - 1;
 
@@ -478,6 +494,9 @@ export const useTurnActions = (
     updateDoc(doc(db, 'rooms', roomId), {
       [`players.${userId}.properties`]: myProperties, [`players.${opponentId}.properties`]: opponentProperties,
       [`players.${userId}.money`]: myNewMoney, [`players.${opponentId}.money`]: opponentNewMoney,
+      [`players.${userId}.memories`]: (me?.memories || 0) + myMemoryAdd,
+      [`players.${opponentId}.memories`]: (opponent?.memories || 0) + opMemoryAdd,
+      spendings: {},
       year: nextYear, season: SEASONS[nextSeasonIndex], phase: nextPhase, currentTurn: opponentId 
     }).catch(console.error);
   };
@@ -487,8 +506,7 @@ export const useTurnActions = (
     if (roomData?.bombyPossessedId !== userId) return;
 
     // 逆転要素：総資産で大きく負けているときは、たまに貧乏神が改心してお金をくれる
-    const totalAssets = (p?: { money?: number; properties?: Property[] }) => (p?.money || 0) + (p?.properties || []).reduce((s, x) => s + x.price, 0);
-    if (totalAssets(me) <= totalAssets(opponent) - BOMBY_REFORM.gap && Math.random() < BOMBY_REFORM.prob) {
+    if (totalAssetsOf(me) <= totalAssetsOf(opponent) - BOMBY_REFORM.gap && Math.random() < BOMBY_REFORM.prob) {
       await showAlert(`🌈🌈🌈🌈🌈🌈🌈\n\n「…なんだか かわいそうになってきたのねん。\n今回は これをあげるのねん！」\n\n貧乏神が改心して ${BOMBY_REFORM.gift.toLocaleString()}円 くれた！\n\n🌈🌈🌈🌈🌈🌈🌈`);
       updateDoc(doc(db, 'rooms', roomId), {
         [`players.${userId}.money`]: (me?.money || 0) + BOMBY_REFORM.gift,
@@ -563,7 +581,7 @@ export const useTurnActions = (
     spentInput, setSpentInput,
     handleRollDice, handleConfirmMove, handleUseItem, handleDiscardItem, 
     handleArrive, 
-    handleAddDestinationNote, handleRemoveDestinationNote, handleSkipToMission, handleSetMissionResult, 
+    handleAddDestinationNote, handleRemoveDestinationNote, handleSkipToMission, handleSetMissionResult, handleSetSpending, 
     handleEndMission, handleSubmitSpending, handleFinishSpending, 
     handleSubmitBid, handleRevealBids, handleBombyAction,
   };

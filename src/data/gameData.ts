@@ -15,6 +15,8 @@ export type Mission = {
   penalty: number;
   penaltyType?: 'money' | 'half_money' | 'bomby';
   difficulty: number;
+  /** ご当地グルメミッション（駅のお店での買い物を楽しむ） */
+  tag?: 'gourmet';
 };
 
 export type Item = {
@@ -243,6 +245,11 @@ const MISSIONS_BASE: Mission[] = [
   { id: 'm_blue_9', name: 'ネイチャーハント', description: '街の中で「赤い花」または「野鳥」を見つけて写真を撮れ！', type: 'blue', reward: 800, penalty: 0, difficulty: 2 },
   { id: 'm_blue_10', name: '巨城の主', description: '現在地から見える「一番高い建物」を背景に、ドヤ顔で自撮りしろ！', type: 'blue', reward: 500, penalty: 0, difficulty: 1 },
 
+  // 🍡 ご当地グルメ（青マス）2026-11-26 追加
+  { id: 'm_blue_11', name: 'ご当地グルメハンター', description: 'この駅の名物・ご当地グルメを買って食べ、写真を撮れ！', type: 'blue', reward: 1000, penalty: 0, difficulty: 2, tag: 'gourmet' },
+  { id: 'm_blue_12', name: '物件のお店で一品', description: 'この駅の物件のお店で何か1つ買って、写真を撮れ！', type: 'blue', reward: 800, penalty: 0, difficulty: 1, tag: 'gourmet' },
+  { id: 'm_blue_13', name: 'ワンコイングルメ', description: '500円玉1枚で買える食べ物を見つけて、おいしく食べろ！', type: 'blue', reward: 800, penalty: 0, difficulty: 2, tag: 'gourmet' },
+
   // 🔴 赤マス（マイナスリスク） 10種（🔑 最新データに更新！）
   { id: 'm_red_1', name: '価格ピタリ賞', description: 'コンビニ等で「税込み100円ピッタリ」の商品を見つけて写真を撮れ！', type: 'red', reward: 0, penalty: 1000, penaltyType: 'money', difficulty: 3 },
   { id: 'm_red_2', name: 'ミッション・インポッシブル', description: '相手にバレずに、相手の背中越しに自撮りを成功させろ！', type: 'red', reward: 0, penalty: 500, penaltyType: 'money', difficulty: 2 },
@@ -266,6 +273,10 @@ const MISSIONS_BASE: Mission[] = [
   { id: 'm_green_8', name: '記憶力シンクロ', description: 'お店の外観を10秒見て背を向け、相手からのクイズに答えろ！', type: 'green', reward: 1000, penalty: 0, difficulty: 2 },
   { id: 'm_green_9', name: '影絵アート', description: '2人の「影」を組み合わせて、地面に「ハートマーク」を作って撮影しろ！', type: 'green', reward: 800, penalty: 0, difficulty: 1 },
   { id: 'm_green_10', name: '振り返りシンクロ', description: '背中合わせで歩き出し、5歩目で同時に振り返って目が合えば成功！（ズレたら失敗）', type: 'green', reward: 1000, penalty: 0, difficulty: 2 },
+  // 🍡 ご当地グルメ（協力マス）2026-11-26 追加
+  { id: 'm_green_11', name: '食べ比べ', description: '同じジャンルの食べ物を別々のお店で1つずつ買い、2人で食べ比べて感想を言い合え！', type: 'green', reward: 1000, penalty: 0, difficulty: 1, tag: 'gourmet' },
+  { id: 'm_green_12', name: 'シェアグルメ', description: 'この駅の名物を1つ買って2人で半分こし、写真を撮れ！', type: 'green', reward: 800, penalty: 0, difficulty: 1, tag: 'gourmet' },
+  { id: 'm_green_13', name: '地元の人のおすすめ', description: 'お店の人か地元の人におすすめを聞いて、そのお店で買い物しろ！', type: 'green', reward: 1500, penalty: 0, difficulty: 3, tag: 'gourmet' },
 ];
 
 /**
@@ -411,3 +422,54 @@ export const pickStayTime = (rand: () => number = Math.random) => {
  * 新しいルールのシミュレーションで S 約 5%・A 約 20%・B 約 40%・C 約 35% になる
  */
 export const RANK_THRESHOLDS = { S: 15000, A: 7000, B: 2500 };
+
+// ==========================================
+// 🏷️ 物件のジャンルと「ジャンル集めボーナス」（2026-11-26）
+// ==========================================
+export type Genre = 'カフェ' | 'パン' | 'スイーツ' | 'グルメ' | '買い物' | '名所';
+export const GENRES: Genre[] = ['カフェ', 'パン', 'スイーツ', 'グルメ', '買い物', '名所'];
+export const GENRE_ICON: Record<Genre, string> = { カフェ: '☕', パン: '🥐', スイーツ: '🍰', グルメ: '🍜', 買い物: '🛍️', 名所: '⛩️' };
+
+/** 物件の名前からジャンルを決める（物件を本決まりにするときは、物件データに genre を書けばそちらを優先） */
+export const genreOf = (p: Property & { genre?: Genre }): Genre => {
+  if (p.genre) return p.genre;
+  if (p.type === 'fixed') return '名所';
+  const n = p.name;
+  if (/カフェ|コーヒー|ドリンクバー|モーニング/.test(n)) return 'カフェ';
+  if (/パン|ベーカリー|サンドイッチ/.test(n)) return 'パン';
+  if (/スイーツ|ケーキ|クッキー|和菓子|たい焼き|団子|大福|ジェラート|アイス|ソフトクリーム|デザート|フルーツ|ポップコーン/.test(n)) return 'スイーツ';
+  if (/ラーメン|餃子|そば|蕎麦|定食|食堂|レストラン|ランチ|弁当|唐揚げ|惣菜|コロッケ|たこ焼き|ファストフード|洋食|焼肉|ホットスナック|居酒屋/.test(n)) return 'グルメ';
+  return '買い物';
+};
+
+/** 同じジャンルの物件をこの数以上持っていると、そのジャンルの決算の収益が GENRE_BONUS_MULTIPLIER 倍 */
+export const GENRE_BONUS_THRESHOLD = 3;
+export const GENRE_BONUS_MULTIPLIER = 2;
+
+/** ジャンルごとの所有数 */
+export const countGenres = (props: Property[]) => {
+  const c = Object.fromEntries(GENRES.map((g) => [g, 0])) as Record<Genre, number>;
+  for (const p of props) c[genreOf(p)]++;
+  return c;
+};
+
+/** 決算の収益（ジャンル集めボーナス込み）。bonusGenres は 2 倍になったジャンル */
+export const propertyIncome = (props: Property[]) => {
+  const counts = countGenres(props);
+  const bonusGenres = GENRES.filter((g) => counts[g] >= GENRE_BONUS_THRESHOLD);
+  const income = props.reduce((sum, p) => {
+    const base = Math.floor(p.price * (p.rate / 100));
+    return sum + (bonusGenres.includes(genreOf(p)) ? base * GENRE_BONUS_MULTIPLIER : base);
+  }, 0);
+  return { income, bonusGenres };
+};
+
+// ==========================================
+// 🛍️ 思い出ボーナス（2026-11-26）
+// ==========================================
+/** 駅で使った金額を、1 駅この金額まで「思い出」として総資産に足す */
+export const MEMORY_CAP_PER_STATION = 1000;
+
+/** 総資産 ＝ 所持金 ＋ 物件の価値 ＋ 思い出 */
+export const totalAssetsOf = (p?: { money?: number; properties?: Property[]; memories?: number }) =>
+  (p?.money || 0) + (p?.properties || []).reduce((s, x) => s + x.price, 0) + (p?.memories || 0);
